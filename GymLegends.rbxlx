@@ -193014,7 +193014,6 @@ Config.Upgrades = {
 	{ Id = "Speed", Name = "Sprint Shoes", Icon = "👟", Desc = "+1.5 walk speed per level", Max = 8, BaseCost = 5000, Growth = 3, PerLevel = 1.5 },
 	{ Id = "PetSlots", Name = "Pet Slot", Icon = "🐾", Desc = "+1 equipped pet slot", Max = 5, BaseCost = 5000000, Growth = 30, PerLevel = 1 },
 	{ Id = "MultiHatch", Name = "Triple Open", Icon = "❓", Desc = "Open 3 Lucky Blocks at once", Max = 1, BaseCost = 2000000, Growth = 1, PerLevel = 1 },
-	{ Id = "AutoTrain", Name = "Auto Trainer", Icon = "🤖", Desc = "Trains for you while you stand at a station", Max = 1, BaseCost = 20000000, Growth = 1, PerLevel = 1 },
 }
 Config.UpgradesById = {}
 for _, u in ipairs(Config.Upgrades) do
@@ -193344,7 +193343,7 @@ local FOLDER_NAME = "GymRemotes"
 
 Remotes.Events = {
 	-- client -&gt; server
-	"Train", "StopTraining", "SetAutoTrain", "ClientReady",
+	"Train", "StopTraining", "ClientReady",
 	-- server -&gt; client
 	"TrainResult", "TrainingState", "Notify", "Announce", "SyncState", "SyncInventory",
 	"CoinPickup", "AreaUnlocked", "GateDenied", "Rebirthed", "Milestone",
@@ -195298,30 +195297,6 @@ Actions.StopTraining = { Target = "Online", Kind = "Edit", Run = function(ctx)
 	return done("Stopped their training.", nil, session, nil)
 end }
 
-Actions.SetAutoTrain = { Target = "Online", Kind = "Edit", Run = function(ctx, args)
-	if type(args.Enabled) ~= "boolean" then
-		return fail("Enabled must be true or false.")
-	end
-	if args.Enabled and Formulas.Level(ctx.Profile.Upgrades, "AutoTrain") &lt; 1 then
-		return fail("They don't own the Auto Trainer. Use Grant Auto Trainer first.")
-	end
-	local old = ctx.Profile.AutoTrain == true
-	S.TrainingService.SetAutoTrain(ctx.Target, args.Enabled)
-	syncProgress(ctx.Target)
-	return done("Auto Train " .. (args.Enabled and "ON" or "OFF") .. ".", nil, old, args.Enabled)
-end }
-
-Actions.GrantAutoTrainer = { Target = "Online", Kind = "Edit", Run = function(ctx)
-	local def = Config.UpgradesById.AutoTrain
-	if not def then
-		return fail("This game has no Auto Trainer upgrade.")
-	end
-	if Formulas.Level(ctx.Profile.Upgrades, def.Id) &gt;= 1 then
-		return fail("They already own the Auto Trainer.")
-	end
-	return setUpgrade(ctx, def, 1)
-end }
-
 -- Donation shop items (perks like the Auto Clicker, tips) ---------------------------
 Actions.GrantDonation = { Target = "Online", Kind = "Edit", Run = function(ctx, args)
 	local item, err = idArg(args, "ItemId", Config.DonationsById, "donation item")
@@ -195682,8 +195657,6 @@ local function playerDetails(admin, level, player)
 		d.Pets = pets
 		d.Quest = S.QuestService.GetView(player)
 		d.Stats = copyFlat(profile.Stats)
-		d.AutoTrain = profile.AutoTrain == true
-		d.OwnsAutoTrain = Formulas.Level(profile.Upgrades, "AutoTrain") &gt;= 1
 		d.Perks = copyFlat(profile.Perks or {})
 		d.Donated = profile.Donated or 0
 	end
@@ -196205,6 +196178,12 @@ local function sanitize(profile)
 			profile.UnlockedAreas[id] = nil
 		end
 	end
+	for id in pairs(profile.Upgrades) do
+		if not Config.UpgradesById[id] then
+			profile.Upgrades[id] = nil -- removed upgrades (e.g. the old Auto Trainer)
+		end
+	end
+	profile.AutoTrain = false
 	for perk in pairs(profile.Perks) do
 		if not Config.DonationPerks or not Config.DonationPerks[perk] then
 			profile.Perks[perk] = nil
@@ -200202,9 +200181,6 @@ function TrainingService.Init(services)
 		TrainingService.EndTraining(player)
 	end)
 
-	Remotes.Get("SetAutoTrain").OnServerEvent:Connect(function(player, value)
-		TrainingService.SetAutoTrain(player, value)
-	end)
 
 	-- Buying unlocks the rack/machine. It never spawns a Tool or auto-equips it.
 	Remotes.Get("BuyEquipment").OnServerInvoke = function(player, stationId)
@@ -200260,11 +200236,6 @@ function TrainingService.Init(services)
 			for player, state in pairs(states) do
 				if not stillValid(player, state) then
 					TrainingService.EndTraining(player)
-				else
-					local profile = profileOf(player)
-					if profile and profile.AutoTrain and Formulas.Level(profile.Upgrades, "AutoTrain") &gt;= 1 then
-						doRep(player, state)
-					end
 				end
 			end
 		end
@@ -200275,20 +200246,6 @@ end
 function TrainingService.GetSession(player)
 	local state = states[player]
 	return state and state.StationId or nil
-end
-
--- Auto Train on/off; only allowed when the player owns the Auto Trainer upgrade.
-function TrainingService.SetAutoTrain(player, enabled)
-	local profile = profileOf(player)
-	if not profile or type(enabled) ~= "boolean" then
-		return false
-	end
-	if enabled and Formulas.Level(profile.Upgrades, "AutoTrain") &lt; 1 then
-		return false
-	end
-	profile.AutoTrain = enabled
-	S.StatService.MarkState(player)
-	return true
 end
 
 function TrainingService.OnCharacter(player, character)
@@ -200331,8 +200288,6 @@ local function applyUpgradeEffects(player, profile, id)
 		S.StatService.ApplyWalkSpeed(player) -- walk speed is always derived from the upgrade
 	elseif id == "PetSlots" then
 		S.PetService.Sync(player) -- trims the equipped list if there are fewer slots now
-	elseif id == "AutoTrain" and Formulas.Level(profile.Upgrades, "AutoTrain") &lt; 1 then
-		profile.AutoTrain = false
 	end
 	S.StatService.Refresh(player)
 	S.StatService.SyncNow(player)
@@ -201221,8 +201176,7 @@ function BUILD.Dashboard(d)
 	tile(r4, w, { Label = "EQUIPPED PETS", Value = #(d.Equipped or {}) .. " / " .. (d.Slots or Config.Game.BasePetSlots), Height = 58 })
 	local q = d.Quest
 	tile(r4, w, { Label = "QUEST", Value = q and ("#" .. q.Index .. "  " .. Format.Number(q.Progress) .. "/" .. Format.Number(q.Goal)) or "-", ValueSize = 16, Height = 58 })
-	tile(r4, w, { Label = "AUTO TRAIN", Value = d.AutoTrain and "ON" or (d.OwnsAutoTrain and "OFF" or "NOT OWNED"), Color = d.AutoTrain and UIKit.C.Good or UIKit.C.Muted,
-		ValueSize = 17, Height = 58 })
+	tile(r4, w, { Label = "DONATED", Value = "R$ " .. Format.Commas(d.Donated or 0), Height = 58 })
 	tile(r4, w, { Label = "LIFETIME REPS", Value = Format.Number(d.Stats and d.Stats.Reps or 0), Height = 58 })
 
 	local s4 = section("QUICK ACTIONS", "AdminShield", "🛡️")
@@ -201587,18 +201541,6 @@ function BUILD.Player(d)
 		button(r4, "FREEZE", Color3.fromRGB(60, 170, 220), 100, function() act("Freeze") end, { Disabled = d.IsYou })
 	end
 	button(r4, "STOP TRAINING", COL.Gray, 150, function() act("StopTraining") end, { Disabled = not d.Training })
-
-	local s3 = section("AUTO TRAIN", "UPG_AutoTrain", "🤖")
-	local r5 = s3.Row(34)
-	chip(r5, d.AutoTrain and "AUTO TRAIN: ON" or "AUTO TRAIN: OFF", d.AutoTrain and COL.Green or UIKit.C.Gray, { TextSize = 14 })
-	if d.OwnsAutoTrain then
-		button(r5, d.AutoTrain and "TURN OFF" or "TURN ON", d.AutoTrain and COL.Red or COL.Green, 120, function()
-			act("SetAutoTrain", { Enabled = not d.AutoTrain })
-		end)
-	else
-		label(r5, "They don't own the Auto Trainer.", 230, { TextSize = 13, Color = UIKit.C.Muted })
-		button(r5, "GRANT AUTO TRAINER", COL.Purple, 190, function() act("GrantAutoTrainer") end)
-	end
 
 	-- every donation-shop item can be handed out here (Config.Donations)
 	local sd = section("DONATION ITEMS  (DONATED R$ " .. Format.Commas(d.Donated or 0) .. ")", "Shop", "🛒")
@@ -205063,7 +205005,7 @@ end
 
 local function buildGateBar(parent)
 	local holder = UIKit.Frame({ Name = "GymProgress", Color = Color3.new(0, 0, 0), Transparency = 1, Size = UDim2.fromOffset(520, 78),
-		Position = UDim2.new(0.5, -44, 0, 4), AnchorPoint = Vector2.new(0.5, 0), Parent = parent })
+		Position = UDim2.new(0.5, -44, 0, -2), AnchorPoint = Vector2.new(0.5, 0), Parent = parent })
 	gate.Frame = holder
 	gate.Title = UIKit.Text({ Name = "Title", Text = "", TextSize = 18, Size = UDim2.new(1, -150, 0, 24), Position = UDim2.new(0.5, 0, 0, 6), AnchorPoint = Vector2.new(0.5, 0),
 		StrokeThickness = 2.5, ZIndex = 4, Parent = holder })
@@ -205137,22 +205079,6 @@ local function buildMenu(parent)
 		addBadge(button, item.Name)
 	end
 
-	-- Auto Train toggle switch (only shown once you own the upgrade)
-	local toggle = Instance.new("TextButton")
-	toggle.Name = "AutoToggle"
-	toggle.Text = ""
-	toggle.BackgroundTransparency = 1
-	toggle.Size = UDim2.fromOffset(180, 44)
-	toggle.LayoutOrder = 10
-	toggle.Visible = false
-	toggle.Parent = left
-	local track = UIKit.Frame({ Name = "Track", Color = Color3.fromRGB(70, 60, 56), Size = UDim2.fromOffset(62, 38), Position = UDim2.fromOffset(0, 3), Radius = 6, Stroke = Color3.fromRGB(12, 12, 16), StrokeThickness = 3, Parent = toggle })
-	local knob = UIKit.Frame({ Name = "Knob", Color = Color3.fromRGB(150, 150, 150), Size = UDim2.fromOffset(26, 30), Position = UDim2.fromOffset(4, 4), Radius = 5, Parent = track })
-	UIKit.Text({ Text = "Auto Train", TextSize = 19, Size = UDim2.new(1, -72, 1, 0), Position = UDim2.fromOffset(72, 0), XAlign = Enum.TextXAlignment.Left, Parent = toggle })
-	toggle:SetAttribute("Knob", "ok")
-	HUD.AutoButton = toggle
-	HUD.AutoKnob = knob
-	HUD.AutoTrack = track
 
 	local right = UIKit.Frame({
 		Name = "RightMenu", Color = Color3.new(0, 0, 0), Transparency = 1, Size = UDim2.fromOffset(84, 270),
@@ -205181,8 +205107,9 @@ local function buildQuestCard(parent)
 	card.Position = UDim2.new(0, 22, 0, 102)
 	card.ZIndex = 3
 	-- the clipboard is a button: tap it to fold the card away (e.g. to use the chat) and back
-	local toggle = UIKit.Button({ Name = "QuestToggle", Text = "📋", Color = Color3.fromRGB(52, 140, 255), TextSize = 30, Size = UDim2.fromOffset(52, 52),
-		Position = UDim2.new(0, 6, 0, 86), Radius = 8, ZIndex = 8, Tooltip = "Show / hide the quest", Parent = parent,
+	-- it sits in Roblox's top bar, right next to the chat button (unscaled, like the top bar)
+	local toggle = UIKit.Button({ Name = "QuestToggle", Text = "📋", Color = Color3.fromRGB(52, 140, 255), TextSize = 26, Size = UDim2.fromOffset(44, 44),
+		Position = UDim2.fromOffset(172, 12), Radius = 8, ZIndex = 8, Parent = C.Gui or parent,
 		OnClick = function()
 			quest.Hidden = not quest.Hidden
 			card.Visible = not quest.Hidden
@@ -205416,14 +205343,7 @@ function HUD.SetAutoClick(on, owned)
 end
 
 function HUD.RefreshAuto()
-	if not HUD.AutoButton then
-		return
-	end
-	local owned = Store.UpgradeLevel("AutoTrain") &gt;= 1
-	HUD.AutoButton.Visible = owned
-	local on = Store.State.AutoTrain == true
-	UIKit.Tween(HUD.AutoKnob, 0.12, { Position = on and UDim2.fromOffset(32, 4) or UDim2.fromOffset(4, 4) })
-	HUD.AutoKnob.BackgroundColor3 = on and Color3.fromRGB(64, 236, 56) or Color3.fromRGB(150, 150, 150)
+	-- (the old Auto Trainer upgrade was removed - the Auto Clicker replaces it)
 end
 
 ----------------------------------------------------------------------
@@ -205514,7 +205434,7 @@ function HUD.Init(client)
 
 	-- warning when the game cannot save (Studio without API access / unpublished place)
 	local warn = UIKit.Frame({
-		Name = "NoSaveWarning", Color = Color3.fromRGB(200, 40, 40), Size = UDim2.fromOffset(640, 34), Position = UDim2.new(0.5, 0, 0, 50),
+		Name = "NoSaveWarning", Color = Color3.fromRGB(200, 40, 40), Size = UDim2.fromOffset(640, 34), Position = UDim2.new(0.5, 0, 0, 84),
 		AnchorPoint = Vector2.new(0.5, 0), Radius = 8, Stroke = Color3.new(0, 0, 0), StrokeThickness = 3, Visible = false, ZIndex = 30, Parent = hudRoot,
 	})
 	UIKit.Text({ Text = "⚠️ Progress is NOT being saved - publish the place &amp; enable Studio API Access", TextSize = 17, ZIndex = 31, Parent = warn })
@@ -206973,17 +206893,25 @@ return PanelRebirth
           <Properties>
             <string name="Name">PanelSell</string>
             <ProtectedString name="Source">--[[
-	PanelSell - the Protein Bar. Order from the shake menu to trade some of your Strength
-	for coins (Whey Shake = 10%, Mass Gainer = 50%, Full Stack = 100%; see Config.Sell.Menu).
+	PanelSell - the Protein Bar supplement menu, in the admin-panel style. Order a supplement
+	to trade some of your Strength for coins (Config.Sell: Options + Menu). The server decides
+	the payout (SellStrength remote); the numbers shown here are an estimate.
 ]]
 local PanelSell = {}
 
 local C, UIKit, Store, Config, Format, Remotes
-local panel, strengthLabel, buttons
+local panel
+local cards = {}
+local ui = {}
+-- one colour theme per menu item (same order as Config.Sell.Menu)
+local THEMES = {
+	{ Top = Color3.fromRGB(120, 210, 255), Bottom = Color3.fromRGB(40, 130, 230) },
+	{ Top = Color3.fromRGB(255, 226, 90), Bottom = Color3.fromRGB(236, 150, 20) },
+	{ Top = Color3.fromRGB(255, 120, 96), Bottom = Color3.fromRGB(214, 40, 56) },
+}
 
 local function estimate(fraction)
-	local strength = Store.Attr("Strength")
-	local sold = strength * fraction
+	local sold = Store.Attr("Strength") * fraction
 	if sold &lt; 1 then
 		return 0
 	end
@@ -206998,13 +206926,28 @@ local function menuItem(i)
 end
 
 local function refresh()
-	strengthLabel.Text = "You have  " .. Format.Number(Store.Attr("Strength")) .. " 💪"
+	ui.Strength.Text = Format.Number(Store.Attr("Strength"))
 	for i, fraction in ipairs(Config.Sell.Options) do
+		local c = cards[i]
 		local coins = estimate(fraction)
-		local item = menuItem(i)
-		buttons[i].Text = item.Emoji .. " " .. item.Name .. "\n-" .. math.floor(fraction * 100) .. "% 💪 ➜ 💵 " .. Format.Number(coins)
-		UIKit.SetDisabled(buttons[i], coins &lt;= 0, Color3.fromRGB(96, 100, 128))
+		c.Cost.Text = "-" .. Format.Number(Store.Attr("Strength") * fraction)
+		c.Gain.Text = "+" .. Format.Number(coins)
+		UIKit.SetDisabled(c.Button, coins &lt;= 0, Color3.fromRGB(96, 100, 128))
 	end
+end
+
+local function order(i, fraction)
+	local result = Remotes.Get("SellStrength"):InvokeServer(fraction)
+	if result and result.Ok then
+		C.Sfx.Play("Buy")
+		C.Fx.CoinFly(C.Fx.CharacterPosition() or Vector3.new(), result.Coins)
+		local item = menuItem(i)
+		C.HUD.Toast(item.Name .. " served! +" .. Format.Number(result.Coins) .. " 💵", "Success")
+	else
+		C.Sfx.Play("Error")
+		C.HUD.Toast(result and result.Msg or "Can't sell.", "Error")
+	end
+	refresh()
 end
 
 function PanelSell.Open()
@@ -207014,37 +206957,51 @@ end
 function PanelSell.Init(client)
 	C = client
 	UIKit, Store, Config, Format, Remotes = C.UIKit, C.Store, C.Config, C.Format, C.Remotes
-	panel = UIKit.Panel(C.Root, "Sell", "🥤 Protein Bar", Vector2.new(660, 320), Color3.fromRGB(255, 154, 48))
-	local body = panel.Body
-	UIKit.Text({ Text = "Pick a shake from the menu - you pay with Strength and get coins back. Careful: it lowers your Strength!", TextSize = 16, Color = UIKit.C.Muted, Wrap = true, Size = UDim2.new(1, -30, 0, 44), Position = UDim2.fromOffset(15, 6), ZIndex = 22, Parent = body })
-	strengthLabel = UIKit.Text({ Text = "", TextSize = 24, Color = UIKit.C.Strength, Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 54), ZIndex = 22, Parent = body })
-	buttons = {}
+	panel = UIKit.GoldPanel(C.Root, "Sell", "PROTEIN BAR", Vector2.new(700, 490), { Icon = "Money", Emoji = "🥤" })
+
+	local s = UIKit.Section(panel.Content, "YOUR STRENGTH", { Icon = "Strength", Emoji = "💪", LayoutOrder = 1 })
+	local r = s.Row(40)
+	UIKit.Icon({ Icon = "Strength", Emoji = "💪", Size = UDim2.fromOffset(38, 38), LayoutOrder = 1, ZIndex = 24, Parent = r })
+	ui.Strength = UIKit.Text({ Text = "", TextSize = 28, Color = UIKit.C.Strength, Size = UDim2.fromOffset(160, 40), XAlign = Enum.TextXAlignment.Left,
+		StrokeThickness = 2.6, LayoutOrder = 2, ZIndex = 24, Parent = r })
+	UIKit.Text({ Text = "Trade Strength for coins - it lowers your Strength!", TextSize = 14, Color = UIKit.C.Muted, Size = UDim2.fromOffset(360, 40),
+		XAlign = Enum.TextXAlignment.Left, StrokeThickness = 1.4, LayoutOrder = 3, ZIndex = 24, Parent = r })
+
+	local s2 = UIKit.Section(panel.Content, "SUPPLEMENT MENU", { Icon = "Money", Emoji = "🥤", LayoutOrder = 2 })
+	local row = s2.Row(230)
 	local n = #Config.Sell.Options
+	local width = math.floor((630 - 8 * (n - 1)) / n)
 	for i, fraction in ipairs(Config.Sell.Options) do
-		buttons[i] = UIKit.Button({
-			Text = "", Color = UIKit.C.Orange, TextSize = 18, Size = UDim2.new(1 / n, -14, 0, 104), Position = UDim2.new((i - 1) / n, 8, 1, -14), AnchorPoint = Vector2.new(0, 1), ZIndex = 23, Parent = body,
-			OnClick = function()
-				local result = Remotes.Get("SellStrength"):InvokeServer(fraction)
-				if result and result.Ok then
-					C.Sfx.Play("Buy")
-					C.Fx.CoinFly(C.Fx.CharacterPosition() or Vector3.new(), result.Coins)
-					local item = menuItem(i)
-					C.HUD.Toast(item.Emoji .. " " .. item.Name .. " served! +" .. Format.Number(result.Coins) .. " 💵", "Success")
-				else
-					C.Sfx.Play("Error")
-					C.HUD.Toast(result and result.Msg or "Can't sell.", "Error")
-				end
-				refresh()
-			end,
-		})
+		local item = menuItem(i)
+		local theme = THEMES[(i - 1) % #THEMES + 1]
+		local card = UIKit.Card({ Name = item.Name, Top = Color3.fromRGB(44, 64, 124), Bottom = Color3.fromRGB(26, 36, 78), Size = UDim2.fromOffset(width, 230), Radius = 16,
+			OutlineThickness = 3, Rim = theme.Top, LayoutOrder = i, ZIndex = 24, Parent = row })
+		-- tub-style label on top: the supplement's colour, big emoji, name and size
+		local label = UIKit.Card({ Name = "Label", Top = theme.Top, Bottom = theme.Bottom, Size = UDim2.new(1, -16, 0, 96), Position = UDim2.fromOffset(8, 8), Radius = 14,
+			OutlineThickness = 2, Rim = Color3.new(1, 1, 1), Shine = true, ZIndex = 25, Parent = card })
+		label:FindFirstChild("Rim"):FindFirstChildOfClass("UIStroke").Transparency = 0.5
+		UIKit.Text({ Text = item.Emoji, TextSize = 44, Stroke = false, Size = UDim2.fromOffset(56, 56), Position = UDim2.new(0.5, 0, 0, 2), AnchorPoint = Vector2.new(0.5, 0),
+			ZIndex = 26, Parent = label })
+		UIKit.Text({ Text = string.upper(item.Name), TextSize = 19, Size = UDim2.new(1, -8, 0, 22), Position = UDim2.new(0.5, 0, 0, 56), AnchorPoint = Vector2.new(0.5, 0),
+			StrokeThickness = 2.4, ZIndex = 26, Parent = label })
+		UIKit.Chip({ Text = math.floor(fraction * 100) .. "% OF YOUR STRENGTH", Color = UIKit.C.Outline, TextSize = 11, Size = UDim2.fromOffset(10, 18), AutoWidth = true,
+			Position = UDim2.new(0.5, 0, 1, 8), AnchorPoint = Vector2.new(0.5, 1), ZIndex = 27, Parent = label })
+		UIKit.Text({ Text = item.Desc or "", TextSize = 12, Color = UIKit.C.Muted, Size = UDim2.new(1, -16, 0, 16), Position = UDim2.fromOffset(8, 110), StrokeThickness = 1.2,
+			ZIndex = 25, Parent = card })
+		local _, cost = UIKit.IconLabel({ Icon = "Strength", Emoji = "💪", Text = "", TextSize = 16, IconSize = 22, Align = "Center", Color = UIKit.C.Strength, StrokeThickness = 2,
+			Size = UDim2.new(1, -16, 0, 24), Position = UDim2.fromOffset(8, 128), ZIndex = 25, Parent = card })
+		local _, gain = UIKit.IconLabel({ Icon = "Money", Emoji = "💵", Text = "", TextSize = 18, IconSize = 24, Align = "Center", Color = UIKit.C.Coins, StrokeThickness = 2,
+			Size = UDim2.new(1, -16, 0, 26), Position = UDim2.fromOffset(8, 152), ZIndex = 25, Parent = card })
+		local button = UIKit.Button({ Name = "Order", Text = "ORDER", Color = UIKit.C.Good, TextSize = 20, Gloss = true, Size = UDim2.new(1, -16, 0, 40),
+			Position = UDim2.new(0.5, 0, 1, -8), AnchorPoint = Vector2.new(0.5, 1), Radius = 12, ZIndex = 25, Parent = card,
+			OnClick = function() order(i, fraction) end })
+		cards[i] = { Cost = cost, Gain = gain, Button = button }
 	end
 	Remotes.Get("OpenSell").OnClientEvent:Connect(function()
 		panel.Open()
 	end)
 	Store.Watch("Strength", function()
-		if panel.IsOpen then
-			refresh()
-		end
+		if panel.IsOpen then refresh() end
 	end)
 	panel.OnOpen = refresh
 	refresh()
@@ -207068,7 +207025,7 @@ local PanelShop = {}
 local C, UIKit, Store, Config, Format, Remotes, Formulas
 local panel
 local rows = {}
-local HIDDEN = { AutoTrain = true } -- sold separately (not a coin upgrade in the shop)
+local HIDDEN = {} -- upgrade ids not sold here
 
 function PanelShop.Refresh()
 	local coins = Store.Attr("Coins")
@@ -208067,9 +208024,6 @@ function TrainingController.Init(client)
 		if autoClick and active then
 			sendRep()
 		end
-	end)
-	hud.AutoButton.Activated:Connect(function()
-		Remotes.Get("SetAutoTrain"):FireServer(not Store.State.AutoTrain)
 	end)
 
 	-- The belt is visual-only and can update on RenderStepped.
