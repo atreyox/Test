@@ -202346,7 +202346,6 @@ return SweatAura
 	The server owns training state/payout. Everything here is local presentation.
 ]]
 local TweenService = game:GetService("TweenService")
-local PoseDriver = require(script.Parent:WaitForChild("PoseDriver"))
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -202718,7 +202717,7 @@ end
 local function buildBarbell(scale, plateCount, squat, plateColor)
 	local model, core = newAssembly(squat and "HeldShoulderPressBar" or "HeldDeadliftBar")
 
-	if squat then
+	if true then -- deadlift and shoulder press use the exact same bar
 		-- The same round competition bar as the one on the rack (see GymShared.BarbellDesign).
 		local pieces, labels = BarbellDesign.PressBar(scale)
 		local built = {}
@@ -202848,25 +202847,6 @@ end
 -- Deadlift uses Motor6D.Transform instead of C0. Studio reports C0 as read-only
 -- for the live character joints in this place, so using Transform keeps the
 -- free-weight animation writable and prevents attach/rep/reset errors.
--- The deadlift pose is played by a PoseDriver (Transform written after the Animator every
--- frame); tweening Transform directly is overwritten by the Animator and never shows.
-local deadliftDriver = nil
-local function cacheDeadliftTransforms()
-	if deadliftDriver then deadliftDriver:Destroy() end
-	deadliftDriver = PoseDriver.new(joints)
-end
-
-local function applyDeadliftPose(pose, duration)
-	if deadliftDriver then deadliftDriver:To(pose, duration) end
-end
-
-local function resetDeadliftTransforms()
-	if deadliftDriver then
-		deadliftDriver:Destroy()
-		deadliftDriver = nil
-	end
-end
-
 -- Poses are deliberately stronger than the old ones so the movement is obvious
 -- from the normal Roblox third-person camera.
 local READY = {
@@ -202933,6 +202913,49 @@ local REP_R6 = {
 	Squat = { RS = ang(0, 0, 176), LS = ang(0, 0, -176) },
 	DeadliftLow = { RS = ang(0, 0, 40), LS = ang(0, 0, -40), RH = ang(0, 0, 40), LH = ang(0, 0, -40), Root = CFrame.new(0, 0.2, -0.7) },
 }
+
+-- Deadlift: the same technique as the working shoulder press - the pose is written to the
+-- joints' C0 every frame from a render step (after the Animator), blended between the
+-- lockout pose (READY) and the bottom of the lift (REP.DeadliftLow).
+local DEADLIFT_BIND_NAME = "PlusOneGymDeadlift"
+local deadlift = nil -- { Ready = pose, Low = pose, Alpha, From, To, Start, Dur }
+
+local function deadliftStep()
+	local d = deadlift
+	if not d then return end
+	local t = d.Dur &gt; 0 and math.clamp((os.clock() - d.Start) / d.Dur, 0, 1) or 1
+	local e = t * t * (3 - 2 * t)
+	d.Alpha = d.From + (d.To - d.From) * e
+	for key, motor in pairs(joints) do
+		local base = baseC0[key]
+		if motor and motor.Parent and base then
+			local a = d.Ready[key] or CFrame.new()
+			local b = d.Low[key] or CFrame.new()
+			pcall(function() motor.C0 = base * a:Lerp(b, d.Alpha) end)
+		end
+	end
+end
+
+local function cacheDeadliftTransforms(r6)
+	deadlift = { Ready = r6 and READY_R6.Deadlift or READY.Deadlift, Low = r6 and REP_R6.DeadliftLow or REP.DeadliftLow,
+		Alpha = 0, From = 0, To = 0, Start = os.clock(), Dur = 0 }
+	RunService:UnbindFromRenderStep(DEADLIFT_BIND_NAME)
+	RunService:BindToRenderStep(DEADLIFT_BIND_NAME, Enum.RenderPriority.Character.Value + 20, deadliftStep)
+end
+
+-- target: 0 = standing lockout, 1 = bottom of the lift
+local function driveDeadlift(target, duration)
+	if not deadlift then return end
+	deadlift.From = deadlift.Alpha
+	deadlift.To = target
+	deadlift.Start = os.clock()
+	deadlift.Dur = duration
+end
+
+local function resetDeadliftTransforms()
+	RunService:UnbindFromRenderStep(DEADLIFT_BIND_NAME)
+	deadlift = nil
+end
 
 local function bodyScale(character)
 	local hum = character:FindFirstChildOfClass("Humanoid")
@@ -203762,7 +203785,7 @@ function FreeweightAnim.Attach(character, station)
 		bindShoulderPressRender()
 		updateHeldPressBar()
 	elseif station.Kind == "Deadlift" then
-		local model, core = buildBarbell(scale * 0.7, plateCount, false, plateColor)
+		local model, core = buildBarbell(scale * 0.96, 1, false, plateColor)
 		model.Parent = character
 		visualModels = { model }
 
@@ -203777,8 +203800,7 @@ function FreeweightAnim.Attach(character, station)
 		end
 		core.Anchored = true
 		gripMotors = { newTwoHandGrip(rightHand, leftHand, torso, core) }
-		cacheDeadliftTransforms()
-		applyDeadliftPose(r6 and READY_R6.Deadlift or READY.Deadlift, 0.20)
+		cacheDeadliftTransforms(r6)
 	end
 
 	return true
@@ -203829,10 +203851,10 @@ function FreeweightAnim.Rep(crit)
 	elseif kind == "Deadlift" then
 		local lowerTime = crit and 0.20 or 0.28
 		local riseTime = crit and 0.22 or 0.32
-		applyDeadliftPose(r6 and REP_R6.DeadliftLow or REP.DeadliftLow, lowerTime, Enum.EasingDirection.InOut)
+		driveDeadlift(1, lowerTime)
 		task.delay(lowerTime + hold, function()
 			if generation ~= myGeneration or not activeStation or activeStation.Kind ~= "Deadlift" then return end
-			applyDeadliftPose(r6 and READY_R6.Deadlift or READY.Deadlift, riseTime, Enum.EasingDirection.Out)
+			driveDeadlift(0, riseTime)
 			task.delay(riseTime, function()
 				if generation == myGeneration and activeStation and activeStation.Kind == "Deadlift" then
 					repBusy = false
