@@ -123356,7 +123356,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD10066"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-2143.25</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-2143.273</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -123370,7 +123370,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD10067"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-2142.925</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-2142.948</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -123384,7 +123384,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD10068"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-2142.304</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-2142.327</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -123412,7 +123412,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD10070"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-2148.75</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-2148.727</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -123426,7 +123426,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD10071"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-2149.075</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-2149.052</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -123440,7 +123440,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD10072"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-2149.696</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-2149.673</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -143531,7 +143531,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD11721"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-2563.25</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-2563.273</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -143545,7 +143545,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD11722"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-2562.925</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-2562.948</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -143559,7 +143559,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD11723"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-2562.304</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-2562.327</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -143587,7 +143587,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD11725"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-2568.75</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-2568.727</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -143601,7 +143601,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD11726"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-2569.075</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-2569.052</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -143615,7 +143615,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD11727"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-2569.696</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-2569.673</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -163317,7 +163317,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD13354"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-2983.25</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-2983.273</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -163331,7 +163331,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD13355"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-2982.925</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-2982.948</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -163345,7 +163345,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD13356"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-2982.304</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-2982.327</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -163373,7 +163373,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD13358"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-2988.75</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-2988.727</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -163387,7 +163387,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD13359"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-2989.075</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-2989.052</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -163401,7 +163401,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD13360"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-2989.696</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-2989.673</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -185017,7 +185017,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD15124"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-3403.25</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-3403.273</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -185031,7 +185031,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD15125"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-3402.925</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-3402.948</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -185045,7 +185045,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD15126"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-3402.304</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-3402.327</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -185073,7 +185073,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD15128"><Properties>
 <string name="Name">BarEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.96</Y><Z>-3408.75</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.925393</Y><Z>-3408.727</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>2</X><Y>0.22</Y><Z>0.22</Z></Vector3>
 <Color3 name="Color"><R>0.8235294</R><G>0.8392157</G><B>0.8784314</B></Color3>
 <token name="Material">1088</token>
@@ -185087,7 +185087,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD15129"><Properties>
 <string name="Name">Grip</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.091112</Y><Z>-3409.075</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.794281</Y><Z>-3409.052</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>1.2</X><Y>0.36</Y><Z>0.36</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -185101,7 +185101,7 @@ CARDIO ZONE</string>
 <Item class="Part" referent="GYMWORLD15130"><Properties>
 <string name="Name">GripEnd</string>
 <bool name="Anchored">true</bool>
-<CoordinateFrame name="CFrame"><X>-67.5</X><Y>6.342099</Y><Z>-3409.696</Z><R00>5.677364e-17</R00><R01>-2.293804e-17</R01><R02>1</R02><R10>0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
+<CoordinateFrame name="CFrame"><X>-67.5</X><Y>5.543295</Y><Z>-3409.673</Z><R00>5.677364e-17</R00><R01>2.293804e-17</R01><R02>1</R02><R10>-0.3746066</R10><R11>0.9271839</R11><R12>0</R12><R20>-0.9271839</R20><R21>-0.3746066</R21><R22>6.123234e-17</R22></CoordinateFrame>
 <Vector3 name="size"><X>0.1</X><Y>0.44</Y><Z>0.44</Z></Vector3>
 <Color3 name="Color"><R>0.08627451</R><G>0.08627451</G><B>0.1019608</B></Color3>
 <token name="Material">2311</token>
@@ -198743,8 +198743,9 @@ function builders.Machine(model, cf, theme, s)
 	local bar = cyl(mover, cf, Vector3.new(0, barY, barZ), "X", 3.6, 0.22, CHROME, "Metal", { CanCollide = false, Name = "Bar" })
 	for _, side in ipairs({ -1, 1 }) do
 		-- angled end: tilts down 22 degrees outward
-		local tilt = math.rad(22) * side
-		local endCF = cf * CFrame.new(side * 2.75, barY - 0.34, barZ) * CFrame.Angles(0, 0, tilt)
+		-- starts exactly at the joint ball and runs outward + downward
+		local tilt = math.rad(22)
+		local endCF = cf * CFrame.new(side * (1.8 + math.cos(tilt)), barY - math.sin(tilt), barZ) * CFrame.Angles(0, 0, -side * tilt)
 		cyl(mover, endCF, Vector3.new(0, 0, 0), "X", 2.0, 0.22, CHROME, "Metal", { CanCollide = false, Name = "BarEnd" })
 		cyl(mover, endCF, Vector3.new(side * 0.35, 0, 0), "X", 1.2, 0.36, Color3.fromRGB(22, 22, 26), "Rubber", { CanCollide = false, Name = "Grip" })
 		cyl(mover, endCF, Vector3.new(side * 1.02, 0, 0), "X", 0.1, 0.44, Color3.fromRGB(22, 22, 26), "Rubber", { CanCollide = false, Name = "GripEnd" })
