@@ -192679,6 +192679,23 @@ for _, item in ipairs(Config.Donations.Items) do
 end
 
 ----------------------------------------------------------------------
+-- MUSCLE BODIES  (the character gets a more muscular body as it gets stronger)
+-- Realistic dense muscles need sculpted body MESHES. Upload your own muscular R15 body parts
+-- (Creator Hub &gt; Development Items) or use a muscular body package you own, and put the
+-- body-part asset ids below (0 = keep the normal blocky part). MinAmount is 0..1 from
+-- Formulas.MuscleAmount (roughly: 0.2 = 1K Strength, 0.45 = 1M, 0.7 = 1B, 1 = 1T+).
+----------------------------------------------------------------------
+Config.MuscleBodies = {
+	Enabled = true,
+	Tiers = {
+		{ Name = "Toned", MinAmount = 0.2, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
+		{ Name = "Buff", MinAmount = 0.45, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
+		{ Name = "Huge", MinAmount = 0.7, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
+		{ Name = "Mythical", MinAmount = 0.9, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
+	},
+}
+
+----------------------------------------------------------------------
 -- RARITIES  (Weight = hatch chance in %, BaseMult = pet strength multiplier in the FIRST egg)
 ----------------------------------------------------------------------
 Config.RarityOrder = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret" }
@@ -194130,120 +194147,90 @@ print("[+1 Gym Game] Server ready - " .. #Config.Areas .. " gyms, " .. #Config.S
 </ProtectedString>
       </Properties>
 <Item class="ModuleScript" referent="NEWMOD8"><Properties><string name="Name">MuscleVisuals</string><ProtectedString name="Source">--[[
-	MuscleVisuals (server) - muscles that grow out of the character as it gets stronger.
+	MuscleVisuals (server) - swaps the character's body for more muscular body MESHES as it
+	gets stronger (Config.MuscleBodies). Dense, realistic muscles need sculpted meshes (the
+	kind muscle-sim games use): upload your own body-part meshes or pick a muscular body
+	package, then put the body-part asset ids in Config.MuscleBodies.Tiers. Until ids are
+	filled in, nothing changes and characters keep the blocky body.
 
-	Rounded muscle shapes (pecs, abs, traps, delts, biceps, triceps, forearms, quads, calves)
-	are welded onto the R15 body parts, coloured like the skin under them, and resized from
-	a 0..1 "muscle" amount (Formulas.MuscleAmount: Strength + a bonus per rebirth). They are
-	built on the server, so every player sees them. Massless / non-colliding: they never
-	change movement or hitboxes. R6 characters simply don't get them.
+	Tiers are picked from Formulas.MuscleAmount (Strength + a bonus per rebirth). The body is
+	only re-applied when the tier changes (HumanoidDescription), and everyone sees it.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Formulas = require(ReplicatedStorage:WaitForChild("GymShared").Formulas)
+local Shared = ReplicatedStorage:WaitForChild("GymShared")
+local Config = require(Shared.Config)
 
 local MuscleVisuals = {}
 
--- Pos / Size are fractions of the body part's size (X = width, Y = height, Z = depth).
--- The front of a body part is -Z. Mirror = the same muscle on the other side of the part.
-local MUSCLES = {
-	UpperTorso = {
-		{ Name = "Pec", Pos = Vector3.new(0.24, 0.16, -0.46), Size = Vector3.new(0.46, 0.36, 0.3), Mirror = true },
-		{ Name = "Trap", Pos = Vector3.new(0.2, 0.46, 0.08), Size = Vector3.new(0.34, 0.22, 0.5), Mirror = true },
-		{ Name = "Lat", Pos = Vector3.new(0.47, -0.05, 0.1), Size = Vector3.new(0.18, 0.5, 0.6), Mirror = true },
-		{ Name = "AbTop", Pos = Vector3.new(0.1, -0.14, -0.47), Size = Vector3.new(0.18, 0.13, 0.16), Mirror = true },
-		{ Name = "AbMid", Pos = Vector3.new(0.1, -0.29, -0.47), Size = Vector3.new(0.18, 0.13, 0.16), Mirror = true },
-		{ Name = "AbLow", Pos = Vector3.new(0.1, -0.43, -0.46), Size = Vector3.new(0.17, 0.12, 0.15), Mirror = true },
-	},
-	RightUpperArm = {
-		{ Name = "Delt", Pos = Vector3.new(0.12, 0.34, 0), Size = Vector3.new(0.95, 0.42, 0.95) },
-		{ Name = "Bicep", Pos = Vector3.new(0, -0.02, -0.42), Size = Vector3.new(0.62, 0.55, 0.42) },
-		{ Name = "Tricep", Pos = Vector3.new(0, 0.02, 0.42), Size = Vector3.new(0.6, 0.55, 0.36) },
-	},
-	LeftUpperArm = {
-		{ Name = "Delt", Pos = Vector3.new(-0.12, 0.34, 0), Size = Vector3.new(0.95, 0.42, 0.95) },
-		{ Name = "Bicep", Pos = Vector3.new(0, -0.02, -0.42), Size = Vector3.new(0.62, 0.55, 0.42) },
-		{ Name = "Tricep", Pos = Vector3.new(0, 0.02, 0.42), Size = Vector3.new(0.6, 0.55, 0.36) },
-	},
-	RightLowerArm = { { Name = "Forearm", Pos = Vector3.new(0, 0.18, -0.36), Size = Vector3.new(0.6, 0.5, 0.36) } },
-	LeftLowerArm = { { Name = "Forearm", Pos = Vector3.new(0, 0.18, -0.36), Size = Vector3.new(0.6, 0.5, 0.36) } },
-	RightUpperLeg = { { Name = "Quad", Pos = Vector3.new(0, 0.04, -0.42), Size = Vector3.new(0.78, 0.7, 0.42) } },
-	LeftUpperLeg = { { Name = "Quad", Pos = Vector3.new(0, 0.04, -0.42), Size = Vector3.new(0.78, 0.7, 0.42) } },
-	RightLowerLeg = { { Name = "Calf", Pos = Vector3.new(0, 0.12, 0.42), Size = Vector3.new(0.66, 0.5, 0.42) } },
-	LeftLowerLeg = { { Name = "Calf", Pos = Vector3.new(0, 0.12, 0.42), Size = Vector3.new(0.66, 0.5, 0.42) } },
-}
-local FOLDER = "GymMuscles"
-local MIN_SHOWN = 0.02
+local applied = setmetatable({}, { __mode = "k" }) -- [character] = tier index applied
+local PARTS = { "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg", "Head" }
 
-local function makeMuscle(folder, bodyPart, name)
-	local p = Instance.new("Part")
-	p.Name = name
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.Massless = true
-	p.CastShadow = false
-	p.Material = Enum.Material.SmoothPlastic
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Size = Vector3.new(1, 1, 1)
-	local mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Sphere -- ellipsoid: any Scale works (a plain Ball part must be uniform)
-	mesh.Parent = p
-	local weld = Instance.new("Weld")
-	weld.Part0 = bodyPart
-	weld.Part1 = p
-	weld.Parent = p
-	p.Parent = folder
-	return p
+local function tierFor(amount)
+	local cfg = Config.MuscleBodies
+	local chosen = 0
+	for i, tier in ipairs(cfg and cfg.Tiers or {}) do
+		if amount &gt;= (tier.MinAmount or 0) then
+			chosen = i
+		end
+	end
+	return chosen
 end
 
--- amount: 0..1 (0 = no visible muscles)
+local function hasIds(tier)
+	for _, key in ipairs(PARTS) do
+		if (tier[key] or 0) &gt; 0 then
+			return true
+		end
+	end
+	return false
+end
+
+-- amount: 0..1 (Formulas.MuscleAmount)
 function MuscleVisuals.Apply(character, amount)
-	if not character or not character.Parent then
+	local cfg = Config.MuscleBodies
+	if not cfg or not cfg.Enabled or not character or not character.Parent then
 		return
 	end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.RigType ~= Enum.HumanoidRigType.R15 then
-		return -- R6 bodies have no separate upper / lower limb parts to shape
+		return
 	end
-	local folder = character:FindFirstChild(FOLDER)
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = FOLDER
-		folder.Parent = character
+	local index = tierFor(amount)
+	if applied[character] == index then
+		return
 	end
-	local grow = 0.35 + 0.65 * amount -- size of each muscle relative to its full size
-	for partName, list in pairs(MUSCLES) do
-		local bodyPart = character:FindFirstChild(partName)
-		if bodyPart and bodyPart:IsA("BasePart") then
-			local s = bodyPart.Size
-			for _, def in ipairs(list) do
-				for _, side in ipairs(def.Mirror and { 1, -1 } or { 1 }) do
-					local name = partName .. "_" .. def.Name .. (side &lt; 0 and "_L" or "")
-					local m = folder:FindFirstChild(name)
-					if amount &lt; MIN_SHOWN then
-						if m then m:Destroy() end
-					else
-						m = m or makeMuscle(folder, bodyPart, name)
-						m.Color = bodyPart.Color
-						local size = Vector3.new(def.Size.X * s.X, def.Size.Y * s.Y, def.Size.Z * s.Z) * grow
-						m.Size = size
-						-- push the muscle outwards as it grows so it bulges out of the body
-						local out = 0.5 + 0.5 * amount
-						local offset = Vector3.new(def.Pos.X * side * s.X, def.Pos.Y * s.Y, def.Pos.Z * s.Z * (0.8 + 0.2 * out))
-						local weld = m:FindFirstChildOfClass("Weld")
-						if weld then
-							weld.C0 = CFrame.new(offset)
-						end
-					end
-				end
-			end
+	local tier = cfg.Tiers[index]
+	if index &gt; 0 and not hasIds(tier) then
+		return
+	end
+	applied[character] = index
+	task.spawn(function()
+		local ok, desc = pcall(function()
+			return humanoid:GetAppliedDescription()
+		end)
+		if not ok or not desc then
+			return
 		end
-	end
-end
-
-function MuscleVisuals.Amount(strength, rebirths)
-	return Formulas.MuscleAmount(strength, rebirths)
+		for _, key in ipairs(PARTS) do
+			desc[key] = tier and tier[key] or 0 -- 0 = the default blocky part
+		end
+		-- keep the Strength body scaling that StatService already set
+		local function scaleOf(name, default)
+			local v = humanoid:FindFirstChild(name)
+			return v and v.Value or default
+		end
+		desc.WidthScale = scaleOf("BodyWidthScale", desc.WidthScale)
+		desc.DepthScale = scaleOf("BodyDepthScale", desc.DepthScale)
+		desc.HeightScale = scaleOf("BodyHeightScale", desc.HeightScale)
+		desc.HeadScale = scaleOf("HeadScale", desc.HeadScale)
+		local okApply, err = pcall(function()
+			humanoid:ApplyDescription(desc)
+		end)
+		if not okApply then
+			warn("[+1 Gym Game] Could not apply muscle body tier " .. index .. ": " .. tostring(err))
+			applied[character] = nil
+		end
+	end)
 end
 
 return MuscleVisuals
