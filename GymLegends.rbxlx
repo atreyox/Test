@@ -192593,6 +192593,7 @@ Config.Admin = {
 	OwnerUserIds = {
 		-- 123456789,
 	},
+	CoOwnerUserIds = {}, -- Co-Owner rank by UserId
 	-- Admin rank by UserId (explicit ids always work).
 	UserIds = {
 		-- 123456789,
@@ -192613,7 +192614,7 @@ Config.Admin = {
 	RankDataStoreName = "GymLegends_AdminRanks_v1", -- ranks given in-game (admin panel &gt; Admins tab)
 	-- Admin ranks, lowest to highest. Level decides who outranks whom: you can only manage
 	-- people below your own level and only hand out ranks below your own. UserIds above
-	-- are "Admin", SuperAdminUserIds are "Head Admin", the game owner is "Owner" (level 5,
+	-- are "Admin", SuperAdminUserIds are "Head Admin", the game owner is "Owner" (level 6,
 	-- every permission). In a Studio test (AllowStudioTesting) players get "Admin" rights.
 	Ranks = {
 		{ Name = "Moderator", Level = 2, Color = Color3.fromRGB(64, 170, 255),
@@ -192621,6 +192622,10 @@ Config.Admin = {
 		{ Name = "Admin", Level = 3, Color = Color3.fromRGB(150, 92, 255),
 			Permissions = { "Player", "Kick", "TempBan", "Logs", "Save", "Stats", "Progression", "Pets", "Quests", "Donations", "Server" } },
 		{ Name = "Head Admin", Level = 4, Color = Color3.fromRGB(255, 160, 28),
+			Permissions = { "Player", "Kick", "TempBan", "Logs", "Save", "Stats", "Progression", "Pets", "Quests", "Donations", "Server",
+				"PermBan", "Reset", "Shutdown", "ManageAdmins" } },
+		-- Co-Owner: can do everything the owner can (and give every rank below Co-Owner)
+		{ Name = "Co-Owner", Level = 5, Color = Color3.fromRGB(255, 70, 90),
 			Permissions = { "Player", "Kick", "TempBan", "Logs", "Save", "Stats", "Progression", "Pets", "Quests", "Donations", "Server",
 				"PermBan", "Reset", "Shutdown", "ManageAdmins" } },
 	},
@@ -194270,15 +194275,15 @@ local MAX -- Config.Game.MaxValue
 
 -- Admin levels (higher = more power)
 -- (Moderator / Admin / Head Admin come from Config.Admin.Ranks; SuperAdmin = Head Admin)
-local LEVEL = { None = 0, Tester = 1, Moderator = 2, Admin = 3, SuperAdmin = 4, Owner = 5 }
-local LEVEL_NAMES = { [0] = "Player", [1] = "Studio Tester", [2] = "Moderator", [3] = "Admin", [4] = "Head Admin", [5] = "Owner" }
+local LEVEL = { None = 0, Tester = 1, Moderator = 2, Admin = 3, SuperAdmin = 4, CoOwner = 5, Owner = 6 }
+local LEVEL_NAMES = { [0] = "Player", [1] = "Studio Tester", [2] = "Moderator", [3] = "Admin", [4] = "Head Admin", [5] = "Co-Owner", [6] = "Owner" }
 local ranksByName = {}  -- [rank name] = rank def (Config.Admin.Ranks)
 local ranksByLevel = {} -- [level] = rank def
 local storedRanks = {}  -- [userId] = rank name given in-game (rank DataStore)
 local rankStore
 AdminService.Levels = LEVEL
 
-local adminIds, superIds, ownerIds = {}, {}, {}
+local adminIds, superIds, ownerIds, coOwnerIds = {}, {}, {}, {}
 local levelCache = {}  -- [player] = { Level = n, Until = os.clock() }
 local frozen = {}      -- [userId] = true (re-applied on every respawn, cleared when they leave)
 local lastDenied = {}  -- [player] = os.clock() of the last logged unauthorized call
@@ -194339,6 +194344,9 @@ local function computeConfigLevel(player)
 			certain = certain and ok
 		end
 	end
+	if coOwnerIds[userId] then
+		return LEVEL.CoOwner, true
+	end
 	if superIds[userId] then
 		return LEVEL.SuperAdmin, true
 	end
@@ -194393,6 +194401,9 @@ end
 local function configLevelOfUserId(userId)
 	if ownerIds[userId] then
 		return LEVEL.Owner, true
+	end
+	if coOwnerIds[userId] then
+		return LEVEL.CoOwner, true
 	end
 	local online = Players:GetPlayerByUserId(userId)
 	if online then
@@ -195932,7 +195943,7 @@ STATE.Admins = function(_, level)
 		list[#list + 1] = { UserId = userId, Name = nameOf(userId), Rank = rank, Level = def and def.Level or 0, Source = "Panel",
 			CanManage = level &gt; (def and def.Level or 0) and AdminService.HasPermission(level, "ManageAdmins") }
 	end
-	for _, pair in ipairs({ { superIds, LEVEL.SuperAdmin }, { adminIds, LEVEL.Admin } }) do
+	for _, pair in ipairs({ { coOwnerIds, LEVEL.CoOwner }, { superIds, LEVEL.SuperAdmin }, { adminIds, LEVEL.Admin } }) do
 		for userId in pairs(pair[1]) do
 			if not storedRanks[userId] then
 				list[#list + 1] = { UserId = userId, Name = nameOf(userId), Rank = LEVEL_NAMES[pair[2]], Level = pair[2], Source = "Config", CanManage = false }
@@ -196054,6 +196065,7 @@ function AdminService.Init(services)
 	adminIds = toSet(Cfg.UserIds)
 	superIds = toSet(Cfg.SuperAdminUserIds)
 	ownerIds = toSet(Cfg.OwnerUserIds)
+	coOwnerIds = toSet(Cfg.CoOwnerUserIds)
 	for _, rank in ipairs(Cfg.Ranks or {}) do
 		ranksByName[rank.Name] = rank
 		ranksByLevel[rank.Level] = rank
