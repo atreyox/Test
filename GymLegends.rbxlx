@@ -208569,14 +208569,16 @@ local POSES = {
 		Out = 0.07,
 		Back = 0.17,
 	},
-	-- Deadlift (bar in both hands): stand tall with the bar at the hips, hinge down with
-	-- bent knees until the plates touch the floor, drive back up.
+	-- Deadlift (bar in both hands), a full conventional pull from the floor:
+	-- Rest = set-up at the bottom (hips back, flat back, bar on the floor, arms long),
+	-- Rep  = full lockout (hips through, standing tall, shoulders back), then back down.
 	Deadlift = {
-		Rest = { RS = ang(6), LS = ang(6), RE = ang(4), LE = ang(4), Waist = ang(-3) },
-		Rep = { RS = ang(52), LS = ang(52), RE = ang(2), LE = ang(2), RH = ang(62), LH = ang(62), RK = ang(-78), LK = ang(-78),
+		Rest = { RS = ang(52), LS = ang(52), RE = ang(2), LE = ang(2), RH = ang(62), LH = ang(62), RK = ang(-78), LK = ang(-78),
 			Waist = ang(-44), Root = CFrame.new(0, -1.05, 0.35) },
-		Out = 0.3,
-		Back = 0.34,
+		Rep = { RS = ang(-4), LS = ang(-4), RE = ang(2), LE = ang(2), RH = ang(-4), LH = ang(-4), Waist = ang(5), Root = CFrame.new(0, 0, -0.04) },
+		Out = 0.38,  -- floor -&gt; lockout
+		Hold = 0.14, -- squeeze at the top
+		Back = 0.42, -- lower the bar back to the floor
 	},
 	-- Giant weights (boulder / anvil / Olympus weight): squat down, then heave overhead.
 	Lift = {
@@ -208783,7 +208785,7 @@ local function start(stationId)
 			-- same pose system as the boulder / machines; the held bar follows the hands
 			joints = findJoints(character)
 			driver = joints and PoseDriver.new(joints) or nil
-			applyPose(POSES.Deadlift.Rest, 0.25)
+			applyPose(POSES.Deadlift.Rest, 0.35) -- grab it: go down to the bar on the floor
 		end
 		if stationDef.Kind == "Squat" or stationDef.Kind == "Deadlift" then
 			local stockModel = findStationModel(stationId)
@@ -208860,7 +208862,7 @@ local function playRep()
 			local pose = POSES.Deadlift
 			applyPose(pose.Rep, pose.Out)
 			local myStation = stationDef
-			task.delay(pose.Out + 0.06, function()
+			task.delay(pose.Out + (pose.Hold or 0.06), function()
 				if active and stationDef == myStation then applyPose(pose.Rest, pose.Back) end
 			end)
 		end
