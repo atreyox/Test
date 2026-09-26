@@ -207722,32 +207722,46 @@ local function resetPose()
 	joints = nil
 end
 
--- Treadmill: a steady, athletic running stride - arms locked near 90 degrees swinging
--- front to back, a slight forward lean, a controlled knee drive with the rear leg
--- pushing off, and only a small vertical bounce. Reps raise the pace a little.
-local function jogPose(dt)
-	jogBoost = math.max(0, jogBoost - dt * 1.2)
-	treadmillPhase = (treadmillPhase + dt * (9.5 + 2.5 * jogBoost)) % (math.pi * 2)
-	local s = math.sin(treadmillPhase)
-	local c = math.cos(treadmillPhase)
-	if isR6 then
-		return {
-			RS = CFrame.Angles(0, 0, math.rad(34 * s)), LS = CFrame.Angles(0, 0, math.rad(34 * s)),
-			RH = CFrame.Angles(0, 0, math.rad(-30 * s)), LH = CFrame.Angles(0, 0, math.rad(-30 * s)),
-		}
+-- Treadmill: the REAL Roblox run animation - the one in the character's Animate script
+-- (so it matches the player's avatar animation pack), with Roblox's default run as a
+-- fallback. Played at Action priority so it wins over idle; reps speed it up briefly.
+local DEFAULT_RUN = { R15 = "rbxassetid://913376220", R6 = "rbxassetid://180426354" }
+local runTrack = nil
+
+local function stopRun()
+	if runTrack then
+		runTrack:Stop(0.2)
+		runTrack = nil
 	end
-	-- the leg swinging forward flexes at the knee (recovery), the planted leg stays long
-	local rightRecover = math.max(0, -s)
-	local leftRecover = math.max(0, s)
-	return {
-		RS = ang(8 + 32 * s, 0, 4), LS = ang(8 - 32 * s, 0, -4),
-		RE = ang(88), LE = ang(88),
-		RW = ang(-6), LW = ang(-6),
-		RH = ang(-34 * s + 4), LH = ang(34 * s + 4),
-		RK = ang(-8 - 62 * rightRecover), LK = ang(-8 - 62 * leftRecover),
-		Waist = ang(-7, 4 * s, 0),
-		Root = CFrame.new(0, 0.05 * math.abs(c) - 0.03, 0) * ang(-3, 0, 0),
-	}
+end
+
+local function startRun(character)
+	stopRun()
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		return
+	end
+	local id
+	local animate = character:FindFirstChild("Animate")
+	local runFolder = animate and animate:FindFirstChild("run")
+	local anim = runFolder and runFolder:FindFirstChildOfClass("Animation")
+	if anim and anim.AnimationId ~= "" then
+		id = anim.AnimationId
+	else
+		id = humanoid.RigType == Enum.HumanoidRigType.R15 and DEFAULT_RUN.R15 or DEFAULT_RUN.R6
+	end
+	local animation = Instance.new("Animation")
+	animation.AnimationId = id
+	local ok, track = pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
+	if ok and track then
+		track.Priority = Enum.AnimationPriority.Action
+		track.Looped = true
+		track:Play(0.25, 1, 1.15)
+		runTrack = track
+	end
 end
 
 ----------------------------------------------------------------------
@@ -207775,6 +207789,7 @@ local function clearLocalState()
 	treadmillRunning = false
 	treadmillPhase = 0
 	jogBoost = 0
+	stopRun()
 	if mover and mover.Model and mover.Model.Parent then
 		mover.Model:PivotTo(mover.Base)
 	end
@@ -207856,8 +207871,10 @@ local function start(stationId)
 			treadmillPhase = 0
 			treadmillRunning = true
 			if driver then
-				driver:SetLive(jogPose)
+				driver:Destroy() -- the real run animation drives the body
+				driver = nil
 			end
+			startRun(character)
 		else
 			applyPose(pose.Rest, 0.25)
 			if stationDef.Pose == "Punch" and driver then
@@ -207899,6 +207916,12 @@ local function playRep()
 	else
 		if stationDef.Kind == "Treadmill" then
 			jogBoost = 1
+			if runTrack then
+				runTrack:AdjustSpeed(1.6) -- sprint for a moment on every rep
+				task.delay(0.6, function()
+					if runTrack then runTrack:AdjustSpeed(1.15) end
+				end)
+			end
 		else
 			local pose = POSES[stationDef.Pose] or POSES.Press
 			local repPose = pose.Rep
