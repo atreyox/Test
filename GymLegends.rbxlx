@@ -192679,23 +192679,6 @@ for _, item in ipairs(Config.Donations.Items) do
 end
 
 ----------------------------------------------------------------------
--- MUSCLE BODIES  (the character gets a more muscular body as it gets stronger)
--- Realistic dense muscles need sculpted body MESHES. Upload your own muscular R15 body parts
--- (Creator Hub &gt; Development Items) or use a muscular body package you own, and put the
--- body-part asset ids below (0 = keep the normal blocky part). MinAmount is 0..1 from
--- Formulas.MuscleAmount (roughly: 0.2 = 1K Strength, 0.45 = 1M, 0.7 = 1B, 1 = 1T+).
-----------------------------------------------------------------------
-Config.MuscleBodies = {
-	Enabled = true,
-	Tiers = {
-		{ Name = "Toned", MinAmount = 0.2, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
-		{ Name = "Buff", MinAmount = 0.45, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
-		{ Name = "Huge", MinAmount = 0.7, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
-		{ Name = "Mythical", MinAmount = 0.9, Torso = 0, LeftArm = 0, RightArm = 0, LeftLeg = 0, RightLeg = 0 },
-	},
-}
-
-----------------------------------------------------------------------
 -- RARITIES  (Weight = hatch chance in %, BaseMult = pet strength multiplier in the FIRST egg)
 ----------------------------------------------------------------------
 Config.RarityOrder = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret" }
@@ -193365,12 +193348,6 @@ end
 ----------------------------------------------------------------------
 -- Looks: the character physically grows as you get stronger
 ----------------------------------------------------------------------
--- 0..1: how big the visible muscles are (Strength in powers of ten + a bonus per rebirth)
-function Formulas.MuscleAmount(strength, rebirths)
-	local fromStrength = (math.log10(math.max(1, strength)) - 1) / 11
-	return math.clamp(fromStrength + (rebirths or 0) * 0.02, 0, 1)
-end
-
 function Formulas.BodyScale(strength, rebirths)
 	local width = 1 + math.log10(math.max(1, strength)) * 0.035 + rebirths * 0.015
 	width = math.clamp(width, 1, 1.9)
@@ -194146,95 +194123,6 @@ end
 print("[+1 Gym Game] Server ready - " .. #Config.Areas .. " gyms, " .. #Config.Stations .. " machines, " .. #Config.Pets .. " pets.")
 </ProtectedString>
       </Properties>
-<Item class="ModuleScript" referent="NEWMOD8"><Properties><string name="Name">MuscleVisuals</string><ProtectedString name="Source">--[[
-	MuscleVisuals (server) - swaps the character's body for more muscular body MESHES as it
-	gets stronger (Config.MuscleBodies). Dense, realistic muscles need sculpted meshes (the
-	kind muscle-sim games use): upload your own body-part meshes or pick a muscular body
-	package, then put the body-part asset ids in Config.MuscleBodies.Tiers. Until ids are
-	filled in, nothing changes and characters keep the blocky body.
-
-	Tiers are picked from Formulas.MuscleAmount (Strength + a bonus per rebirth). The body is
-	only re-applied when the tier changes (HumanoidDescription), and everyone sees it.
-]]
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Shared = ReplicatedStorage:WaitForChild("GymShared")
-local Config = require(Shared.Config)
-
-local MuscleVisuals = {}
-
-local applied = setmetatable({}, { __mode = "k" }) -- [character] = tier index applied
-local PARTS = { "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg", "Head" }
-
-local function tierFor(amount)
-	local cfg = Config.MuscleBodies
-	local chosen = 0
-	for i, tier in ipairs(cfg and cfg.Tiers or {}) do
-		if amount &gt;= (tier.MinAmount or 0) then
-			chosen = i
-		end
-	end
-	return chosen
-end
-
-local function hasIds(tier)
-	for _, key in ipairs(PARTS) do
-		if (tier[key] or 0) &gt; 0 then
-			return true
-		end
-	end
-	return false
-end
-
--- amount: 0..1 (Formulas.MuscleAmount)
-function MuscleVisuals.Apply(character, amount)
-	local cfg = Config.MuscleBodies
-	if not cfg or not cfg.Enabled or not character or not character.Parent then
-		return
-	end
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.RigType ~= Enum.HumanoidRigType.R15 then
-		return
-	end
-	local index = tierFor(amount)
-	if applied[character] == index then
-		return
-	end
-	local tier = cfg.Tiers[index]
-	if index &gt; 0 and not hasIds(tier) then
-		return
-	end
-	applied[character] = index
-	task.spawn(function()
-		local ok, desc = pcall(function()
-			return humanoid:GetAppliedDescription()
-		end)
-		if not ok or not desc then
-			return
-		end
-		for _, key in ipairs(PARTS) do
-			desc[key] = tier and tier[key] or 0 -- 0 = the default blocky part
-		end
-		-- keep the Strength body scaling that StatService already set
-		local function scaleOf(name, default)
-			local v = humanoid:FindFirstChild(name)
-			return v and v.Value or default
-		end
-		desc.WidthScale = scaleOf("BodyWidthScale", desc.WidthScale)
-		desc.DepthScale = scaleOf("BodyDepthScale", desc.DepthScale)
-		desc.HeightScale = scaleOf("BodyHeightScale", desc.HeightScale)
-		desc.HeadScale = scaleOf("HeadScale", desc.HeadScale)
-		local okApply, err = pcall(function()
-			humanoid:ApplyDescription(desc)
-		end)
-		if not okApply then
-			warn("[+1 Gym Game] Could not apply muscle body tier " .. index .. ": " .. tostring(err))
-			applied[character] = nil
-		end
-	end)
-end
-
-return MuscleVisuals
-</ProtectedString></Properties></Item>
 <Item class="ModuleScript" referent="NEWMOD7"><Properties><string name="Name">DonationService</string><ProtectedString name="Source">--[[
 	DonationService - the Robux donation shop (Config.Donations).
 
@@ -199801,7 +199689,6 @@ local Shared = ReplicatedStorage:WaitForChild("GymShared")
 local Format = require(Shared.Format)
 local Formulas = require(Shared.Formulas)
 local IconSlot = require(Shared.IconSlot)
-local MuscleVisuals = require(script.Parent:WaitForChild("MuscleVisuals"))
 
 local StatService = {}
 
@@ -199811,7 +199698,6 @@ local dirtyState = {}    -- [player] = true
 local lastStateSent = {} -- [player] = os.clock()
 local tags = {}          -- [player] = { Name=, Rebirth=, Strength= }
 local lastScale = {}     -- [player] = width scale last applied
-local lastMuscle = {}    -- [player] = muscle amount last applied
 local leaderstats = {}   -- [player] = { Gym=, Rebirths=, Strength=, Total=, Coins= }
 
 local function profileOf(player)
@@ -200064,12 +199950,6 @@ local function applyBodyScale(player, force)
 		return
 	end
 	local width, height = Formulas.BodyScale(profile.Strength, profile.Rebirths)
-	-- visible muscles grow with Strength (only rebuilt when the amount really changes)
-	local amount = Formulas.MuscleAmount(profile.Strength, profile.Rebirths)
-	if force or not lastMuscle[player] or math.abs(lastMuscle[player] - amount) &gt;= 0.02 then
-		lastMuscle[player] = amount
-		MuscleVisuals.Apply(player.Character, amount)
-	end
 	if not force and lastScale[player] and math.abs(lastScale[player] - width) &lt; 0.01 then
 		return
 	end
@@ -200086,8 +199966,6 @@ local function applyBodyScale(player, force)
 		set("BodyDepthScale", width)
 		set("BodyHeightScale", height)
 		set("HeadScale", height)
-		-- body parts just resized: refit the muscles to the new part sizes
-		task.delay(0.3, MuscleVisuals.Apply, player.Character, amount)
 	end
 end
 
@@ -200236,7 +200114,6 @@ function StatService.PlayerLeaving(player)
 	lastStateSent[player] = nil
 	tags[player] = nil
 	lastScale[player] = nil
-	lastMuscle[player] = nil
 	leaderstats[player] = nil
 end
 
