@@ -192605,6 +192605,41 @@ Config.Admin = {
 	MaxBanMinutes = 5 * 365 * 24 * 60,
 	MaxGivePets = 25,           -- pets per "Give Pet" request
 	MaxQuestIndex = 10000,
+	RankDataStoreName = "GymLegends_AdminRanks_v1", -- ranks given in-game (admin panel &gt; Admins tab)
+	-- Admin ranks, lowest to highest. Level decides who outranks whom: you can only manage
+	-- people below your own level and only hand out ranks below your own. UserIds above
+	-- are "Admin", SuperAdminUserIds are "Head Admin", the game owner is "Owner" (level 5,
+	-- every permission). In a Studio test (AllowStudioTesting) players get "Admin" rights.
+	Ranks = {
+		{ Name = "Moderator", Level = 2, Color = Color3.fromRGB(64, 170, 255),
+			Permissions = { "Player", "Kick", "TempBan", "Logs", "Save" } },
+		{ Name = "Admin", Level = 3, Color = Color3.fromRGB(150, 92, 255),
+			Permissions = { "Player", "Kick", "TempBan", "Logs", "Save", "Stats", "Progression", "Pets", "Quests", "Donations", "Server" } },
+		{ Name = "Head Admin", Level = 4, Color = Color3.fromRGB(255, 160, 28),
+			Permissions = { "Player", "Kick", "TempBan", "Logs", "Save", "Stats", "Progression", "Pets", "Quests", "Donations", "Server",
+				"PermBan", "Reset", "Shutdown", "ManageAdmins" } },
+	},
+	-- which permission each admin action needs (checked on the server, mirrored in the panel)
+	ActionPermissions = {
+		SavePlayer = "Save", ForceSync = "Save",
+		SetStrength = "Stats", AddStrength = "Stats", SetTotalStrength = "Stats", AddTotalStrength = "Stats", SetCoins = "Stats", AddCoins = "Stats",
+		SetRebirths = "Stats", AddRebirths = "Stats", MaxRebirths = "Stats",
+		UnlockGym = "Progression", LockGym = "Progression", UnlockAllGyms = "Progression", LockAllGyms = "Progression",
+		GrantStation = "Progression", RemoveStation = "Progression", GrantAllStations = "Progression", RemoveAllStations = "Progression",
+		SetUpgrade = "Progression", StepUpgrade = "Progression", MaxUpgrade = "Progression", ResetUpgrade = "Progression", ResetAllUpgrades = "Progression",
+		GivePet = "Pets", EquipPet = "Pets", UnequipPet = "Pets", DeletePet = "Pets", EquipBestPets = "Pets", UnequipAllPets = "Pets",
+		LockPet = "Pets", UnlockPet = "Pets", DeleteUnlockedPets = "Pets", ClearPets = "Pets",
+		SetQuestProgress = "Quests", CompleteQuest = "Quests", ResetQuestProgress = "Quests", PreviousQuest = "Quests", NextQuest = "Quests",
+		SetQuestIndex = "Quests", SetLifetimeStat = "Quests",
+		TeleportToGym = "Player", UnlockAndTeleport = "Progression", TeleportToBeginner = "Player", BringToAdmin = "Player", GoToPlayer = "Player",
+		Respawn = "Player", Heal = "Player", Kill = "Player", Freeze = "Player", Unfreeze = "Player", StopTraining = "Player",
+		GrantDonation = "Donations", RevokeDonation = "Donations",
+		ResetData = "Reset",
+		Kick = "Kick", Ban = "TempBan", Unban = "TempBan",
+		Announce = "Server", SaveAll = "Server", SyncAll = "Server", ReturnAllToBeginner = "Server",
+		Shutdown = "Shutdown",
+		SetAdminRank = "ManageAdmins", RemoveAdminRank = "ManageAdmins",
+	},
 	BanPresets = {
 		{ Label = "10 MIN", Minutes = 10 },
 		{ Label = "1 HOUR", Minutes = 60 },
@@ -193313,6 +193348,12 @@ end
 ----------------------------------------------------------------------
 -- Looks: the character physically grows as you get stronger
 ----------------------------------------------------------------------
+-- 0..1: how big the visible muscles are (Strength in powers of ten + a bonus per rebirth)
+function Formulas.MuscleAmount(strength, rebirths)
+	local fromStrength = (math.log10(math.max(1, strength)) - 1) / 11
+	return math.clamp(fromStrength + (rebirths or 0) * 0.02, 0, 1)
+end
+
 function Formulas.BodyScale(strength, rebirths)
 	local width = 1 + math.log10(math.max(1, strength)) * 0.035 + rebirths * 0.015
 	width = math.clamp(width, 1, 1.9)
@@ -193347,7 +193388,7 @@ Remotes.Events = {
 	-- server -&gt; client
 	"TrainResult", "TrainingState", "Notify", "Announce", "SyncState", "SyncInventory",
 	"CoinPickup", "AreaUnlocked", "GateDenied", "Rebirthed", "Milestone",
-	"OpenEgg", "OpenSell", "PromptEquipment",
+	"OpenEgg", "OpenSell", "PromptEquipment", "AdminRankChanged",
 }
 
 Remotes.Functions = {
@@ -194088,6 +194129,125 @@ end
 print("[+1 Gym Game] Server ready - " .. #Config.Areas .. " gyms, " .. #Config.Stations .. " machines, " .. #Config.Pets .. " pets.")
 </ProtectedString>
       </Properties>
+<Item class="ModuleScript" referent="NEWMOD8"><Properties><string name="Name">MuscleVisuals</string><ProtectedString name="Source">--[[
+	MuscleVisuals (server) - muscles that grow out of the character as it gets stronger.
+
+	Rounded muscle shapes (pecs, abs, traps, delts, biceps, triceps, forearms, quads, calves)
+	are welded onto the R15 body parts, coloured like the skin under them, and resized from
+	a 0..1 "muscle" amount (Formulas.MuscleAmount: Strength + a bonus per rebirth). They are
+	built on the server, so every player sees them. Massless / non-colliding: they never
+	change movement or hitboxes. R6 characters simply don't get them.
+]]
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Formulas = require(ReplicatedStorage:WaitForChild("GymShared").Formulas)
+
+local MuscleVisuals = {}
+
+-- Pos / Size are fractions of the body part's size (X = width, Y = height, Z = depth).
+-- The front of a body part is -Z. Mirror = the same muscle on the other side of the part.
+local MUSCLES = {
+	UpperTorso = {
+		{ Name = "Pec", Pos = Vector3.new(0.24, 0.16, -0.46), Size = Vector3.new(0.46, 0.36, 0.3), Mirror = true },
+		{ Name = "Trap", Pos = Vector3.new(0.2, 0.46, 0.08), Size = Vector3.new(0.34, 0.22, 0.5), Mirror = true },
+		{ Name = "Lat", Pos = Vector3.new(0.47, -0.05, 0.1), Size = Vector3.new(0.18, 0.5, 0.6), Mirror = true },
+		{ Name = "AbTop", Pos = Vector3.new(0.1, -0.14, -0.47), Size = Vector3.new(0.18, 0.13, 0.16), Mirror = true },
+		{ Name = "AbMid", Pos = Vector3.new(0.1, -0.29, -0.47), Size = Vector3.new(0.18, 0.13, 0.16), Mirror = true },
+		{ Name = "AbLow", Pos = Vector3.new(0.1, -0.43, -0.46), Size = Vector3.new(0.17, 0.12, 0.15), Mirror = true },
+	},
+	RightUpperArm = {
+		{ Name = "Delt", Pos = Vector3.new(0.12, 0.34, 0), Size = Vector3.new(0.95, 0.42, 0.95) },
+		{ Name = "Bicep", Pos = Vector3.new(0, -0.02, -0.42), Size = Vector3.new(0.62, 0.55, 0.42) },
+		{ Name = "Tricep", Pos = Vector3.new(0, 0.02, 0.42), Size = Vector3.new(0.6, 0.55, 0.36) },
+	},
+	LeftUpperArm = {
+		{ Name = "Delt", Pos = Vector3.new(-0.12, 0.34, 0), Size = Vector3.new(0.95, 0.42, 0.95) },
+		{ Name = "Bicep", Pos = Vector3.new(0, -0.02, -0.42), Size = Vector3.new(0.62, 0.55, 0.42) },
+		{ Name = "Tricep", Pos = Vector3.new(0, 0.02, 0.42), Size = Vector3.new(0.6, 0.55, 0.36) },
+	},
+	RightLowerArm = { { Name = "Forearm", Pos = Vector3.new(0, 0.18, -0.36), Size = Vector3.new(0.6, 0.5, 0.36) } },
+	LeftLowerArm = { { Name = "Forearm", Pos = Vector3.new(0, 0.18, -0.36), Size = Vector3.new(0.6, 0.5, 0.36) } },
+	RightUpperLeg = { { Name = "Quad", Pos = Vector3.new(0, 0.04, -0.42), Size = Vector3.new(0.78, 0.7, 0.42) } },
+	LeftUpperLeg = { { Name = "Quad", Pos = Vector3.new(0, 0.04, -0.42), Size = Vector3.new(0.78, 0.7, 0.42) } },
+	RightLowerLeg = { { Name = "Calf", Pos = Vector3.new(0, 0.12, 0.42), Size = Vector3.new(0.66, 0.5, 0.42) } },
+	LeftLowerLeg = { { Name = "Calf", Pos = Vector3.new(0, 0.12, 0.42), Size = Vector3.new(0.66, 0.5, 0.42) } },
+}
+local FOLDER = "GymMuscles"
+local MIN_SHOWN = 0.02
+
+local function makeMuscle(folder, bodyPart, name)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.CastShadow = false
+	p.Material = Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Size = Vector3.new(1, 1, 1)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere -- ellipsoid: any Scale works (a plain Ball part must be uniform)
+	mesh.Parent = p
+	local weld = Instance.new("Weld")
+	weld.Part0 = bodyPart
+	weld.Part1 = p
+	weld.Parent = p
+	p.Parent = folder
+	return p
+end
+
+-- amount: 0..1 (0 = no visible muscles)
+function MuscleVisuals.Apply(character, amount)
+	if not character or not character.Parent then
+		return
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+		return -- R6 bodies have no separate upper / lower limb parts to shape
+	end
+	local folder = character:FindFirstChild(FOLDER)
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = FOLDER
+		folder.Parent = character
+	end
+	local grow = 0.35 + 0.65 * amount -- size of each muscle relative to its full size
+	for partName, list in pairs(MUSCLES) do
+		local bodyPart = character:FindFirstChild(partName)
+		if bodyPart and bodyPart:IsA("BasePart") then
+			local s = bodyPart.Size
+			for _, def in ipairs(list) do
+				for _, side in ipairs(def.Mirror and { 1, -1 } or { 1 }) do
+					local name = partName .. "_" .. def.Name .. (side &lt; 0 and "_L" or "")
+					local m = folder:FindFirstChild(name)
+					if amount &lt; MIN_SHOWN then
+						if m then m:Destroy() end
+					else
+						m = m or makeMuscle(folder, bodyPart, name)
+						m.Color = bodyPart.Color
+						local size = Vector3.new(def.Size.X * s.X, def.Size.Y * s.Y, def.Size.Z * s.Z) * grow
+						m.Size = size
+						-- push the muscle outwards as it grows so it bulges out of the body
+						local out = 0.5 + 0.5 * amount
+						local offset = Vector3.new(def.Pos.X * side * s.X, def.Pos.Y * s.Y, def.Pos.Z * s.Z * (0.8 + 0.2 * out))
+						local weld = m:FindFirstChildOfClass("Weld")
+						if weld then
+							weld.C0 = CFrame.new(offset)
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+function MuscleVisuals.Amount(strength, rebirths)
+	return Formulas.MuscleAmount(strength, rebirths)
+end
+
+return MuscleVisuals
+</ProtectedString></Properties></Item>
 <Item class="ModuleScript" referent="NEWMOD7"><Properties><string name="Name">DonationService</string><ProtectedString name="Source">--[[
 	DonationService - the Robux donation shop (Config.Donations).
 
@@ -194229,8 +194389,13 @@ local S, Config, Remotes, Cfg
 local MAX -- Config.Game.MaxValue
 
 -- Admin levels (higher = more power)
-local LEVEL = { None = 0, Tester = 1, Admin = 2, SuperAdmin = 3, Owner = 4 }
-local LEVEL_NAMES = { [0] = "Player", [1] = "Studio Tester", [2] = "Admin", [3] = "Super Admin", [4] = "Owner" }
+-- (Moderator / Admin / Head Admin come from Config.Admin.Ranks; SuperAdmin = Head Admin)
+local LEVEL = { None = 0, Tester = 1, Moderator = 2, Admin = 3, SuperAdmin = 4, Owner = 5 }
+local LEVEL_NAMES = { [0] = "Player", [1] = "Studio Tester", [2] = "Moderator", [3] = "Admin", [4] = "Head Admin", [5] = "Owner" }
+local ranksByName = {}  -- [rank name] = rank def (Config.Admin.Ranks)
+local ranksByLevel = {} -- [level] = rank def
+local storedRanks = {}  -- [userId] = rank name given in-game (rank DataStore)
+local rankStore
 AdminService.Levels = LEVEL
 
 local adminIds, superIds = {}, {}
@@ -194269,7 +194434,7 @@ end
 
 -- Works out a player's level. Explicit UserIds never need a web call; group checks can
 -- fail, in which case the result is only cached briefly ("certain" = false).
-local function computeLevel(player)
+local function computeConfigLevel(player)
 	local userId = player.UserId
 	local certain = true
 	if Cfg.AllowGameCreator then
@@ -194305,6 +194470,17 @@ local function computeLevel(player)
 	return LEVEL.None, certain
 end
 
+-- the higher of the Config rank and a rank given in-game from the admin panel
+local function storedLevel(userId)
+	local rank = storedRanks[userId] and ranksByName[storedRanks[userId]]
+	return rank and rank.Level or LEVEL.None
+end
+
+local function computeLevel(player)
+	local level, certain = computeConfigLevel(player)
+	return math.max(level, storedLevel(player.UserId)), certain
+end
+
 function AdminService.GetLevel(player)
 	if typeof(player) ~= "Instance" or not player:IsA("Player") or player.Parent ~= Players then
 		return LEVEL.None
@@ -194326,7 +194502,7 @@ function AdminService.IsAdmin(player)
 end
 
 -- Level of any account (it may be offline). Returns level, certain.
-local function levelOfUserId(userId)
+local function configLevelOfUserId(userId)
 	local online = Players:GetPlayerByUserId(userId)
 	if online then
 		return AdminService.GetLevel(online), true
@@ -194358,6 +194534,33 @@ local function levelOfUserId(userId)
 		end
 	end
 	return level, true
+end
+
+local function levelOfUserId(userId)
+	local online = Players:GetPlayerByUserId(userId)
+	if online then
+		return AdminService.GetLevel(online), true
+	end
+	local level, certain = configLevelOfUserId(userId)
+	return math.max(level, storedLevel(userId)), certain
+end
+
+-- Permissions: the Owner has all of them; a Studio tester gets the "Admin" rank's set.
+local function permissionsOf(level)
+	if level &gt;= LEVEL.Owner then
+		return true
+	end
+	local rank = ranksByLevel[level == LEVEL.Tester and LEVEL.Admin or level]
+	local set = {}
+	for _, perm in ipairs(rank and rank.Permissions or {}) do
+		set[perm] = true
+	end
+	return set
+end
+
+function AdminService.HasPermission(level, perm)
+	local set = permissionsOf(level)
+	return set == true or set[perm] == true
 end
 
 ----------------------------------------------------------------------
@@ -195471,7 +195674,7 @@ Actions.ReturnAllToBeginner = { Target = "None", Kind = "Safe", Confirm = true, 
 	return done("Sent " .. count .. " player(s) to the " .. Config.Areas[1].Name .. ".", nil, nil, count)
 end }
 
-Actions.Shutdown = { Target = "None", Kind = "Safe", Confirm = "SHUTDOWN", MinLevel = LEVEL.Admin, Run = function(ctx, args)
+Actions.Shutdown = { Target = "None", Kind = "Safe", Confirm = "SHUTDOWN", Run = function(ctx, args)
 	if shuttingDown then
 		return fail("Already shutting down.")
 	end
@@ -195490,6 +195693,95 @@ Actions.Shutdown = { Target = "None", Kind = "Safe", Confirm = "SHUTDOWN", MinLe
 		end
 	end)
 	return done("Shutting down: saving everyone, then kicking with your message.", nil, nil, nil, message)
+end }
+
+-- Admin team (ranks given in-game) ------------------------------------------------
+-- Stored in their own DataStore key; every server reloads it when it changes.
+local function saveRanks()
+	if not rankStore then
+		return false
+	end
+	local ok = pcall(function()
+		rankStore:UpdateAsync("Ranks", function()
+			local out = {}
+			for userId, rank in pairs(storedRanks) do
+				out[tostring(userId)] = rank
+			end
+			return out
+		end)
+	end)
+	task.spawn(pcall, MessagingService.PublishAsync, MessagingService, MESSAGE_TOPIC, { Type = "Ranks" })
+	return ok
+end
+
+local function loadRanks()
+	if not rankStore then
+		return
+	end
+	local ok, data = pcall(function()
+		return rankStore:GetAsync("Ranks")
+	end)
+	if ok and type(data) == "table" then
+		local fresh = {}
+		for key, rank in pairs(data) do
+			local userId = tonumber(key)
+			if userId and type(rank) == "string" and ranksByName[rank] then
+				fresh[userId] = rank
+			end
+		end
+		storedRanks = fresh
+		table.clear(levelCache) -- everyone's level is re-worked out with the new ranks
+	end
+end
+
+local function forgetLevel(userId)
+	local online = Players:GetPlayerByUserId(userId)
+	if online then
+		levelCache[online] = nil
+	end
+end
+
+-- Give a rank from Config.Admin.Ranks. Only ranks BELOW your own, and only to people below you.
+Actions.SetAdminRank = { Target = "UserId", Kind = "Moderate", Run = function(ctx, args)
+	local rank = type(args.Rank) == "string" and ranksByName[args.Rank]
+	if not rank then
+		return fail("Unknown rank.")
+	end
+	if rank.Level &gt;= ctx.Level then
+		return fail("You can only give ranks below your own.")
+	end
+	if ctx.TargetUserId &lt;= 0 and not ctx.Target then
+		return fail("Invalid UserId.")
+	end
+	local old = storedRanks[ctx.TargetUserId]
+	if old == rank.Name then
+		return fail((ctx.TargetName or "They") .. " already have that rank.")
+	end
+	storedRanks[ctx.TargetUserId] = rank.Name
+	forgetLevel(ctx.TargetUserId)
+	local saved = saveRanks()
+	if ctx.Target then
+		S.ServerUtil.Notify(ctx.Target, "You are now a " .. rank.Name .. "! Open the admin panel with the shield button.", "Success")
+		Remotes.Get("AdminRankChanged"):FireClient(ctx.Target)
+	end
+	return done("Gave " .. (ctx.TargetName or tostring(ctx.TargetUserId)) .. " the rank " .. rank.Name .. "."
+		.. (saved and "" or " (Rank store offline - only this server knows.)"), nil, old or "none", rank.Name)
+end }
+
+Actions.RemoveAdminRank = { Target = "UserId", Kind = "Moderate", Run = function(ctx)
+	local old = storedRanks[ctx.TargetUserId]
+	if not old then
+		local configLevel = configLevelOfUserId(ctx.TargetUserId)
+		return fail(configLevel &gt; LEVEL.None and "Their rank is set in Config.Admin - change it there." or "They don't have a rank.")
+	end
+	storedRanks[ctx.TargetUserId] = nil
+	forgetLevel(ctx.TargetUserId)
+	saveRanks()
+	if ctx.Target then
+		S.ServerUtil.Notify(ctx.Target, "Your admin rank was removed.", "Info")
+		Remotes.Get("AdminRankChanged"):FireClient(ctx.Target)
+	end
+	return done("Removed " .. old .. " from " .. (ctx.TargetName or tostring(ctx.TargetUserId)) .. ".", nil, old, "none")
 end }
 
 AdminService.Actions = Actions -- exposed for the test harness (read-only use)
@@ -195561,8 +195853,13 @@ function AdminService.RunAction(admin, actionName, targetUserId, args)
 	elseif type(args) ~= "table" then
 		return fail("Bad arguments.")
 	end
-	if spec.MinLevel and level &lt; spec.MinLevel then
-		return fail("Your admin rank can't do that.")
+	-- 3. the admin's rank must have the permission this action needs (Config.Admin.ActionPermissions)
+	local perm = (Cfg.ActionPermissions or {})[actionName]
+	if actionName == "Ban" and args.Permanent == true then
+		perm = "PermBan"
+	end
+	if perm and not AdminService.HasPermission(level, perm) then
+		return fail("Your rank (" .. LEVEL_NAMES[level] .. ") can't do that.")
 	end
 	if spec.Confirm ~= nil and args.Confirm ~= spec.Confirm then
 		return fail(type(spec.Confirm) == "string" and ("Type " .. spec.Confirm .. " to confirm.") or "This action needs confirmation.")
@@ -195673,6 +195970,29 @@ STATE.Access = function(admin, level)
 		BanPresets = Cfg.BanPresets,
 		MaxGivePets = Cfg.MaxGivePets,
 		MaxBanMinutes = Cfg.MaxBanMinutes,
+		-- what this rank may do ("All" for the owner) - the panel greys out the rest
+		Permissions = (function()
+			local set = permissionsOf(level)
+			if set == true then
+				return "All"
+			end
+			local list = {}
+			for perm in pairs(set) do
+				list[#list + 1] = perm
+			end
+			return list
+		end)(),
+		GrantableRanks = (function()
+			local list = {}
+			if AdminService.HasPermission(level, "ManageAdmins") then
+				for _, rank in ipairs(Cfg.Ranks or {}) do
+					if rank.Level &lt; level then
+						list[#list + 1] = rank.Name
+					end
+				end
+			end
+			return list
+		end)(),
 	}
 end
 
@@ -195714,7 +196034,31 @@ STATE.Player = function(admin, level, userId)
 	return playerDetails(admin, level, player)
 end
 
-STATE.Logs = function(_, _, filter)
+STATE.Admins = function(_, level)
+	local list = {}
+	for userId, rank in pairs(storedRanks) do
+		local def = ranksByName[rank]
+		list[#list + 1] = { UserId = userId, Name = nameOf(userId), Rank = rank, Level = def and def.Level or 0, Source = "Panel",
+			CanManage = level &gt; (def and def.Level or 0) and AdminService.HasPermission(level, "ManageAdmins") }
+	end
+	for _, pair in ipairs({ { superIds, LEVEL.SuperAdmin }, { adminIds, LEVEL.Admin } }) do
+		for userId in pairs(pair[1]) do
+			if not storedRanks[userId] then
+				list[#list + 1] = { UserId = userId, Name = nameOf(userId), Rank = LEVEL_NAMES[pair[2]], Level = pair[2], Source = "Config", CanManage = false }
+			end
+		end
+	end
+	table.sort(list, function(a, b)
+		if a.Level ~= b.Level then return a.Level &gt; b.Level end
+		return tostring(a.Name) &lt; tostring(b.Name)
+	end)
+	return list
+end
+
+STATE.Logs = function(_, level, filter)
+	if not AdminService.HasPermission(level, "Logs") then
+		error("Your rank can't view the logs.", 0)
+	end
 	local function wanted(key)
 		local v = type(filter) == "table" and filter[key]
 		return type(v) == "string" and #v &gt; 0 and #v &lt;= 40 and string.lower(v) or nil
@@ -195818,6 +196162,22 @@ function AdminService.Init(services)
 	MAX = Config.Game.MaxValue
 	adminIds = toSet(Cfg.UserIds)
 	superIds = toSet(Cfg.SuperAdminUserIds)
+	for _, rank in ipairs(Cfg.Ranks or {}) do
+		ranksByName[rank.Name] = rank
+		ranksByLevel[rank.Level] = rank
+		LEVEL_NAMES[rank.Level] = rank.Name
+	end
+	local okRanks, rs = pcall(function()
+		return DataStoreService:GetDataStore(Cfg.RankDataStoreName or "GymLegends_AdminRanks_v1")
+	end)
+	rankStore = okRanks and rs or nil
+	loadRanks()
+	task.spawn(function()
+		while true do
+			task.wait(120)
+			loadRanks()
+		end
+	end)
 
 	local ok, result = pcall(function()
 		return DataStoreService:GetDataStore(Cfg.BanDataStoreName or "GymLegends_AdminBans_v1")
@@ -195833,6 +196193,10 @@ function AdminService.Init(services)
 		local subscribed, err = pcall(function()
 			MessagingService:SubscribeAsync(MESSAGE_TOPIC, function(message)
 				local data = message.Data
+				if type(data) == "table" and data.Type == "Ranks" then
+					loadRanks() -- someone changed the admin team in another server
+					return
+				end
 				if type(data) ~= "table" or data.Type ~= "Ban" or not isUserId(data.UserId) then
 					return
 				end
@@ -199450,6 +199814,7 @@ local Shared = ReplicatedStorage:WaitForChild("GymShared")
 local Format = require(Shared.Format)
 local Formulas = require(Shared.Formulas)
 local IconSlot = require(Shared.IconSlot)
+local MuscleVisuals = require(script.Parent:WaitForChild("MuscleVisuals"))
 
 local StatService = {}
 
@@ -199459,6 +199824,7 @@ local dirtyState = {}    -- [player] = true
 local lastStateSent = {} -- [player] = os.clock()
 local tags = {}          -- [player] = { Name=, Rebirth=, Strength= }
 local lastScale = {}     -- [player] = width scale last applied
+local lastMuscle = {}    -- [player] = muscle amount last applied
 local leaderstats = {}   -- [player] = { Gym=, Rebirths=, Strength=, Total=, Coins= }
 
 local function profileOf(player)
@@ -199711,6 +200077,12 @@ local function applyBodyScale(player, force)
 		return
 	end
 	local width, height = Formulas.BodyScale(profile.Strength, profile.Rebirths)
+	-- visible muscles grow with Strength (only rebuilt when the amount really changes)
+	local amount = Formulas.MuscleAmount(profile.Strength, profile.Rebirths)
+	if force or not lastMuscle[player] or math.abs(lastMuscle[player] - amount) &gt;= 0.02 then
+		lastMuscle[player] = amount
+		MuscleVisuals.Apply(player.Character, amount)
+	end
 	if not force and lastScale[player] and math.abs(lastScale[player] - width) &lt; 0.01 then
 		return
 	end
@@ -199727,6 +200099,8 @@ local function applyBodyScale(player, force)
 		set("BodyDepthScale", width)
 		set("BodyHeightScale", height)
 		set("HeadScale", height)
+		-- body parts just resized: refit the muscles to the new part sizes
+		task.delay(0.3, MuscleVisuals.Apply, player.Character, amount)
 	end
 end
 
@@ -199875,6 +200249,7 @@ function StatService.PlayerLeaving(player)
 	lastStateSent[player] = nil
 	tags[player] = nil
 	lastScale[player] = nil
+	lastMuscle[player] = nil
 	leaderstats[player] = nil
 end
 
@@ -200756,15 +201131,17 @@ local SECTION_TOP, SECTION_BOTTOM = Color3.fromRGB(32, 48, 98), Color3.fromRGB(1
 local COL -- colour roles, filled in Init (orange = admin, blue = neutral, green = grant, red = remove, purple = special)
 
 local TABS = {
+	-- Perm = the rank permission needed to open the tab (Config.Admin.Ranks)
 	{ Key = "Dashboard", Label = "DASHBOARD", Icon = "AdminShield", Emoji = "🛡️", NeedsPlayer = true },
-	{ Key = "Stats", Label = "STATS", Icon = "Strength", Emoji = "💪", NeedsPlayer = true },
-	{ Key = "Progression", Label = "PROGRESS", Icon = "GymMap", Emoji = "🗺️", NeedsPlayer = true },
-	{ Key = "Pets", Label = "PETS", Icon = "Pets", Emoji = "🐾", NeedsPlayer = true },
-	{ Key = "Quests", Label = "QUESTS", Icon = "Quests", Emoji = "📋", NeedsPlayer = true },
-	{ Key = "Player", Label = "PLAYER", Icon = "AdmPlayer", Emoji = "🧍", NeedsPlayer = true },
-	{ Key = "Moderation", Label = "MODERATION", Icon = "AdmHammer", Emoji = "🔨", NeedsPlayer = false },
-	{ Key = "Server", Label = "SERVER", Icon = "AdmServer", Emoji = "🖥️", NeedsPlayer = false },
-	{ Key = "Logs", Label = "LOGS", Icon = "AdmLogs", Emoji = "📜", NeedsPlayer = false },
+	{ Key = "Stats", Label = "STATS", Icon = "Strength", Emoji = "💪", NeedsPlayer = true, Perm = "Stats" },
+	{ Key = "Progression", Label = "PROGRESS", Icon = "GymMap", Emoji = "🗺️", NeedsPlayer = true, Perm = "Progression" },
+	{ Key = "Pets", Label = "PETS", Icon = "Pets", Emoji = "🐾", NeedsPlayer = true, Perm = "Pets" },
+	{ Key = "Quests", Label = "QUESTS", Icon = "Quests", Emoji = "📋", NeedsPlayer = true, Perm = "Quests" },
+	{ Key = "Player", Label = "PLAYER", Icon = "AdmPlayer", Emoji = "🧍", NeedsPlayer = true, Perm = "Player" },
+	{ Key = "Moderation", Label = "MODERATION", Icon = "AdmHammer", Emoji = "🔨", NeedsPlayer = false, Perm = "Kick" },
+	{ Key = "Server", Label = "SERVER", Icon = "AdmServer", Emoji = "🖥️", NeedsPlayer = false, Perm = "Server" },
+	{ Key = "Logs", Label = "LOGS", Icon = "AdmLogs", Emoji = "📜", NeedsPlayer = false, Perm = "Logs" },
+	{ Key = "Admins", Label = "ADMINS", Icon = "AdminShield", Emoji = "👑", NeedsPlayer = false, Perm = "ManageAdmins" },
 }
 local QUICK_ADDS = { { "+1K", 1e3 }, { "+10K", 1e4 }, { "+1M", 1e6 }, { "+1B", 1e9 }, { "+1T", 1e12 } }
 local PETS_PER_PAGE = 18
@@ -200871,6 +201248,15 @@ local function getState(kind, arg)
 	return result.Data
 end
 
+-- does our rank have this permission? (display only - the server checks every request)
+local function can(perm)
+	if not perm or not access then
+		return true
+	end
+	local p = access.Permissions
+	return p == "All" or (type(p) == "table" and table.find(p, perm) ~= nil)
+end
+
 local render -- forward declarations
 local refresh
 
@@ -200924,6 +201310,15 @@ local function act(action, args, opts)
 	opts = opts or {}
 	if state.Busy then
 		toast("Still working on the last request...", "Info")
+		return
+	end
+	local perm = C.Config.Admin.ActionPermissions and C.Config.Admin.ActionPermissions[action]
+	if action == "Ban" and args and args.Permanent then
+		perm = "PermBan"
+	end
+	if not can(perm) then
+		toast("Your rank (" .. tostring(access.LevelName) .. ") can't do that.", "Error")
+		C.Sfx.Play("Error")
 		return
 	end
 	local target = opts.Target
@@ -201778,6 +202173,74 @@ function BUILD.Logs()
 	end
 end
 
+-- Admins -------------------------------------------------------------------
+function BUILD.Admins(d)
+	local grantable = access.GrantableRanks or {}
+	local options = {}
+	for _, name in ipairs(grantable) do
+		options[#options + 1] = { Value = name, Text = string.upper(name) }
+	end
+	state.GiveRank = state.GiveRank or (options[1] and options[1].Value)
+
+	local s = section("GIVE AN ADMIN RANK", "AdminShield", "👑")
+	local r1 = s.Row(34)
+	label(r1, d and ("To: " .. d.DisplayName .. " (@" .. d.Name .. ")") or "Pick a player on the left, or use a UserId below", 200, { TextSize = 14 })
+	if #options &gt; 0 then
+		select(r1, options, state.GiveRank, 160, function(v) state.GiveRank = v end)
+	end
+	button(r1, "GIVE RANK", COL.Green, 120, function()
+		act("SetAdminRank", { Rank = state.GiveRank })
+	end, { Safe = true, Disabled = d == nil or #options == 0 or d.IsYou })
+	button(r1, "REMOVE", COL.Red, 96, function()
+		act("RemoveAdminRank", {})
+	end, { Safe = true, Disabled = d == nil or d.IsYou })
+	local r2 = s.Row(34)
+	local idBox = input(r2, "RankUserId", "UserId (offline players too)", 220)
+	button(r2, "GIVE TO USERID", COL.Green, 150, function()
+		local id = tonumber(idBox.Text)
+		if not id then toast("Type a UserId.", "Error") return end
+		act("SetAdminRank", { Rank = state.GiveRank }, { Target = id })
+	end, { Safe = true, Disabled = #options == 0 })
+	button(r2, "REMOVE", COL.Red, 96, function()
+		local id = tonumber(idBox.Text)
+		if not id then toast("Type a UserId.", "Error") return end
+		act("RemoveAdminRank", {}, { Target = id })
+	end, { Safe = true })
+	label(s.Row(20), "You can only give ranks below your own (" .. tostring(access.LevelName) .. ").", 500, { TextSize = 12, Color = UIKit.C.Muted })
+
+	local s2 = section("ADMIN TEAM", "AdmPlayer", "🧍")
+	local team = state.Admins
+	if not team then
+		label(s2.Row(30), "Loading...", 200, { Color = UIKit.C.Muted })
+	elseif #team == 0 then
+		label(s2.Row(30), "No admins yet - give someone a rank above.", 400, { Color = UIKit.C.Muted })
+	else
+		for _, a in ipairs(team) do
+			local r = s2.Row(34)
+			label(r, tostring(a.Name) .. "  (" .. a.UserId .. ")", 240, { TextSize = 15, StrokeThickness = 2 })
+			local rankDef
+			for _, rk in ipairs(Config.Admin.Ranks) do
+				if rk.Name == a.Rank then rankDef = rk end
+			end
+			chip(r, string.upper(a.Rank), rankDef and rankDef.Color or COL.Purple, { TextSize = 12 })
+			chip(r, a.Source == "Config" and "SET IN CONFIG" or "GIVEN IN-GAME", UIKit.C.NavyLight, { TextSize = 11 })
+			if a.Source ~= "Config" then
+				button(r, "REMOVE", COL.Red, 90, function() act("RemoveAdminRank", {}, { Target = a.UserId }) end, { Safe = true, Disabled = not a.CanManage })
+			end
+		end
+	end
+
+	local s3 = section("RANK PERMISSIONS", "AdmLogs", "📜", Color3.fromRGB(150, 110, 255), Color3.fromRGB(96, 56, 214))
+	for _, rk in ipairs(Config.Admin.Ranks) do
+		local r = s3.Row(40, true)
+		UIKit.Chip({ Text = string.upper(rk.Name), Color = rk.Color, TextSize = 13, Size = UDim2.fromOffset(120, 24), Position = UDim2.new(0, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5), ZIndex = 24, Parent = r })
+		UIKit.Text({ Text = table.concat(rk.Permissions, ", "), TextSize = 12, Color = UIKit.C.Muted, Wrap = true, Size = UDim2.new(1, -130, 1, 0),
+			Position = UDim2.fromOffset(130, 0), XAlign = Enum.TextXAlignment.Left, StrokeThickness = 1, ZIndex = 24, Parent = r })
+	end
+	label(s3.Row(20), "OWNER: every permission.  Change what each rank may do in Config.Admin.Ranks.", 560, { TextSize = 12, Color = UIKit.C.Muted })
+end
+
 ----------------------------------------------------------------------
 -- rendering
 ----------------------------------------------------------------------
@@ -201874,7 +202337,8 @@ function render()
 	end
 	for key, b in pairs(ui.TabButtons) do
 		local active = key == state.Tab
-		UIKit.SetButtonColor(b, active and COL.Gold or UIKit.C.NavyLight)
+		local def = tabDef(key)
+		UIKit.SetButtonColor(b, active and COL.Gold or (can(def.Perm) and UIKit.C.NavyLight or Color3.fromRGB(46, 50, 66)))
 		local o = UIKit.OutlineOf(b)
 		if o then
 			o.Color = active and Color3.new(1, 1, 1) or UIKit.C.Outline
@@ -201944,6 +202408,9 @@ function refresh(force)
 		if state.Tab == "Logs" then
 			state.Logs = getState("Logs", state.LogFilter) or state.Logs
 		end
+		if state.Tab == "Admins" then
+			state.Admins = getState("Admins") or state.Admins
+		end
 		refreshing = false
 		renderPlayers()
 		render()
@@ -202001,9 +202468,13 @@ local function build()
 		local b = UIKit.Button({ Name = t.Key, Text = "", Color = UIKit.C.NavyLight, Size = UDim2.fromOffset(tabW, 52), Radius = 10, LayoutOrder = i, ZIndex = 23,
 			Gloss = true, Tooltip = t.Key == "Progression" and "Gyms, equipment and upgrades" or nil, Parent = tabs,
 			OnClick = function()
+				if not can(t.Perm) then
+					toast("Your rank (" .. tostring(access.LevelName) .. ") can't use the " .. t.Label .. " tab.", "Error")
+					return
+				end
 				state.Tab = t.Key
 				render()
-				if t.Key == "Server" or t.Key == "Logs" then
+				if t.Key == "Server" or t.Key == "Logs" or t.Key == "Admins" then
 					refresh(true)
 				end
 			end })
@@ -202091,6 +202562,20 @@ function PanelAdmin.Init(client)
 		Purple = Color3.fromRGB(146, 84, 240),
 		Gray = UIKit.C.Gray,
 	}
+	-- An admin rank was given / removed while we're in the server: ask again.
+	Remotes.Get("AdminRankChanged").OnClientEvent:Connect(function()
+		task.wait(0.5)
+		local data = getState("Access")
+		access = data or access
+		if data and not panel then
+			build()
+			buildButton()
+		elseif panel then
+			if ui.Button then ui.Button.Visible = data ~= nil end
+			if not data and panel.IsOpen then panel.Close() end
+			if data then render() end
+		end
+	end)
 	-- Ask the server once whether we are an admin. Non-admins never get the panel or
 	-- the button (cosmetic - the server re-checks every request anyway).
 	task.spawn(function()
