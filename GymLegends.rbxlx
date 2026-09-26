@@ -199292,7 +199292,7 @@ return QuestService
           <string name="Name">RebirthService</string>
           <ProtectedString name="Source">--[[
 	RebirthService - reset Strength for a permanent multiplier (x2 per rebirth by default).
-	Kept forever: coins, pets, upgrades, unlocked gyms, equipment.
+	Kept forever: coins, pets, unlocked gyms, equipment. Upgrades are LOST on rebirth.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("GymShared")
@@ -199327,6 +199327,10 @@ function RebirthService.Init(services)
 		S.TrainingService.EndTraining(player)
 		profile.Rebirths = profile.Rebirths + 1
 		S.StatService.SetStrength(player, 0)
+		-- upgrades reset: walk speed and pet slots follow (extra equipped pets are unequipped)
+		profile.Upgrades = {}
+		S.StatService.ApplyWalkSpeed(player)
+		S.PetService.Sync(player)
 		S.QuestService.Record(player, "Rebirths", 1)
 		S.StatService.Refresh(player)
 		S.StatService.SyncNow(player)
@@ -206866,7 +206870,7 @@ function PanelRebirth.Init(client)
 
 	local s3 = UIKit.Section(panel.Content, "WHAT HAPPENS", { Icon = "AdmLogs", Emoji = "📜", LayoutOrder = 3 })
 	local r3 = s3.Row(62, true)
-	UIKit.Text({ Text = "Your Strength goes back to 0 and you get a permanent Strength boost.\nYou KEEP your coins, pets, upgrades, equipment and unlocked gyms!",
+	UIKit.Text({ Text = "Your Strength goes back to 0 and you get a permanent Strength boost.\nYour UPGRADES are reset too. You KEEP your coins, pets, equipment and unlocked gyms!",
 		TextSize = 15, Color = UIKit.C.Muted, Wrap = true, Size = UDim2.fromScale(1, 1), XAlign = Enum.TextXAlignment.Left, StrokeThickness = 1.4, ZIndex = 24, Parent = r3 })
 
 	local s4 = UIKit.Section(panel.Content, "READY?", { Icon = "RebirthStar", Emoji = "⭐", LayoutOrder = 4, Top = PURPLE_TOP, Bottom = PURPLE_BOTTOM })
