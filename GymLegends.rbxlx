@@ -210639,7 +210639,7 @@ local function setupPull(character, model, m)
 			ik.Target = target
 			ik.Pole = pole
 			ik.Priority = 100
-			ik.SmoothTime = 0.02
+			ik.SmoothTime = 0
 			ik.Weight = 1
 			ik.Parent = humanoid
 			pull.Targets[i] = target
@@ -210885,6 +210885,9 @@ local function updateMover(dt)
 		else
 			mover.Kick = math.max(0, 1 - (t - p.Out - p.Hold) / p.Back)
 		end
+		-- same ease-in-out as the body pose, so the bar, stack and arms move as one
+		local k = mover.Kick
+		mover.Kick = k &lt; 0.5 and 2 * k * k or 1 - (-2 * k + 2) ^ 2 / 2
 	else
 		mover.Kick = math.max(0, mover.Kick - dt * 5.5)
 	end
@@ -210904,6 +210907,10 @@ local function updateMover(dt)
 	end
 	mover.Model:PivotTo(cf)
 	updatePull(kick)
+	if mover.Phase and os.clock() - mover.Phase.Start &gt; mover.Phase.Out + mover.Phase.Hold + mover.Phase.Back then
+		mover.Phase = nil
+		mover.Kick = 0
+	end
 end
 
 ----------------------------------------------------------------------
