@@ -207718,27 +207718,31 @@ local function resetPose()
 	joints = nil
 end
 
--- Treadmill: a proper jog - bent, pumping arms, knee drive, torso twist and a bounce.
--- Every rep kicks the pace up for a moment.
+-- Treadmill: a steady, athletic running stride - arms locked near 90 degrees swinging
+-- front to back, a slight forward lean, a controlled knee drive with the rear leg
+-- pushing off, and only a small vertical bounce. Reps raise the pace a little.
 local function jogPose(dt)
-	jogBoost = math.max(0, jogBoost - dt * 1.5)
-	treadmillPhase = (treadmillPhase + dt * (8.5 + 6 * jogBoost)) % (math.pi * 2)
+	jogBoost = math.max(0, jogBoost - dt * 1.2)
+	treadmillPhase = (treadmillPhase + dt * (9.5 + 2.5 * jogBoost)) % (math.pi * 2)
 	local s = math.sin(treadmillPhase)
 	local c = math.cos(treadmillPhase)
 	if isR6 then
 		return {
-			RS = CFrame.Angles(0, 0, math.rad(48 * s)), LS = CFrame.Angles(0, 0, math.rad(48 * s)),
-			RH = CFrame.Angles(0, 0, math.rad(-42 * s)), LH = CFrame.Angles(0, 0, math.rad(-42 * s)),
+			RS = CFrame.Angles(0, 0, math.rad(34 * s)), LS = CFrame.Angles(0, 0, math.rad(34 * s)),
+			RH = CFrame.Angles(0, 0, math.rad(-30 * s)), LH = CFrame.Angles(0, 0, math.rad(-30 * s)),
 		}
 	end
-	local swing = 40 + 12 * jogBoost
+	-- the leg swinging forward flexes at the knee (recovery), the planted leg stays long
+	local rightRecover = math.max(0, -s)
+	local leftRecover = math.max(0, s)
 	return {
-		RS = ang(18 + swing * s), LS = ang(18 - swing * s),
-		RE = ang(92 + 14 * s), LE = ang(92 - 14 * s),
-		RH = ang(-48 * s + 6), LH = ang(48 * s + 6),
-		RK = ang(-14 - 78 * math.max(0, -s)), LK = ang(-14 - 78 * math.max(0, s)),
-		Waist = ang(-12, 9 * s, 0),
-		Root = CFrame.new(0, 0.1 * math.abs(c) - 0.04, 0),
+		RS = ang(8 + 32 * s, 0, 4), LS = ang(8 - 32 * s, 0, -4),
+		RE = ang(88), LE = ang(88),
+		RW = ang(-6), LW = ang(-6),
+		RH = ang(-34 * s + 4), LH = ang(34 * s + 4),
+		RK = ang(-8 - 62 * rightRecover), LK = ang(-8 - 62 * leftRecover),
+		Waist = ang(-7, 4 * s, 0),
+		Root = CFrame.new(0, 0.05 * math.abs(c) - 0.03, 0) * ang(-3, 0, 0),
 	}
 end
 
