@@ -200733,7 +200733,7 @@ return StatService
           <ProtectedString name="Source">--[[
 	TrainingService - station ownership, free-weight pickup, reps and selling Strength.
 
-	Free weights (Dumbbell / Squat / Deadlift) are rack pickups, never Roblox Tools.
+	Free weights (Dumbbell / Squat) are rack pickups, never Roblox Tools.
 	That keeps them completely separate from the pet inventory. Switching from one
 	free weight to another is an atomic server-side switch: the old session is cleared
 	without sending a temporary "stopped" state, then the new session is sent once.
@@ -200752,7 +200752,6 @@ local states = {} -- [player] = {StationId, Station, Stand, LastRep, Portable}
 local FREE_WEIGHT = {
 	Dumbbell = true,
 	Squat = true,
-	Deadlift = true,
 }
 
 local function profileOf(player)
@@ -200767,7 +200766,7 @@ local function promptAction(station)
 	if not station then return "Train" end
 	if station.Kind == "Dumbbell" then return "Grab Dumbbells" end
 	if station.Kind == "Squat" then return "Grab Barbell" end
-	if station.Kind == "Deadlift" then return "Grab Barbell" end
+	if station.Kind == "Deadlift" then return "Deadlift" end
 	return "Train"
 end
 
@@ -203284,7 +203283,6 @@ local FreeweightAnim = {}
 local FREE_WEIGHT = {
 	Dumbbell = true,
 	Squat = true,
-	Deadlift = true,
 }
 
 local IRON = Color3.fromRGB(24, 25, 30)
@@ -208526,6 +208524,7 @@ local driver = nil -- PoseDriver playing the machine pose (see PoseDriver for wh
 local treadmillPhase = 0
 local treadmillRunning = false
 local jogBoost = 0 -- each treadmill rep speeds the jog up for a moment
+local repBusyUntil = 0 -- a rep animation plays out fully; clicks meanwhile still count, but don't restart it
 
 ----------------------------------------------------------------------
 -- Fixed-machine poses (free-weight poses live in DumbbellAnim)
@@ -208576,14 +208575,19 @@ local POSES = {
 		Rest = { RS = ang(52), LS = ang(52), RE = ang(2), LE = ang(2), RH = ang(62), LH = ang(62), RK = ang(-78), LK = ang(-78),
 			Waist = ang(-44), Root = CFrame.new(0, -1.05, 0.35) },
 		Rep = { RS = ang(-4), LS = ang(-4), RE = ang(2), LE = ang(2), RH = ang(-4), LH = ang(-4), Waist = ang(5), Root = CFrame.new(0, 0, -0.04) },
-		Out = 0.38,  -- floor -&gt; lockout
-		Hold = 0.14, -- squeeze at the top
-		Back = 0.42, -- lower the bar back to the floor
+		Out = 0.6,   -- floor -&gt; lockout
+		Hold = 0.3,  -- squeeze at the top
+		Back = 0.65, -- lower the bar back to the floor
+		Held = true, -- the bar is carried in the hands
 	},
 	-- Giant weights (boulder / anvil / Olympus weight): squat down, then heave overhead.
 	Lift = {
 		Rest = { RS = ang(40, 0, 20), LS = ang(40, 0, -20), RH = ang(55), LH = ang(55), RK = ang(-70), LK = ang(-70), Waist = ang(-20), Root = CFrame.new(0, -0.9, 0.2) },
 		Rep = { RS = ang(170, 0, 14), LS = ang(170, 0, -14), Waist = ang(4), Root = CFrame.new(0, 0.15, 0) },
+		Out = 0.7,   -- heave it all the way overhead
+		Hold = 0.35, -- hold it up there
+		Back = 0.75, -- bring it back down
+		Held = true, -- the weight is carried in the hands
 	},
 	-- Machines (gravity trainer / plasma press / ascension engine): seated-style row pull.
 	Pull = {
@@ -208713,6 +208717,41 @@ local function findStationModel(stationId)
 	return nil
 end
 
+-- Heavy lifts (deadlift, giant weights): a local copy of the station's weight is carried
+-- between the hands while the stock one on the platform is hidden.
+local held = nil -- { Model, Offset }
+local function handPositions(character)
+	local r = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+	local l = character:FindFirstChild("LeftHand") or character:FindFirstChild("Left Arm")
+	if not r or not l then return nil end
+	local function palm(part)
+		if part.Name:find("Arm") then
+			return (part.CFrame * CFrame.new(0, -part.Size.Y * 0.45, 0)).Position
+		end
+		return part.Position
+	end
+	return palm(r), palm(l)
+end
+
+local function updateHeld()
+	if not held or not held.Model.Parent then return end
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local r, l = handPositions(character)
+	if not r then return end
+	local mid = (r + l) / 2
+	local rot = root.CFrame - root.CFrame.Position
+	held.Model:PivotTo(CFrame.new(mid) * rot * held.Offset)
+end
+
+local function dropHeld()
+	if held then
+		held.Model:Destroy()
+		held = nil
+	end
+end
+
 local function setStockVisible(moverModel, visible)
 	if not moverModel then return end
 	for _, obj in ipairs(moverModel:GetDescendants()) do
@@ -208729,6 +208768,8 @@ local function clearLocalState()
 	treadmillPhase = 0
 	jogBoost = 0
 	stopRun()
+	dropHeld()
+	repBusyUntil = 0
 	if mover and mover.Model and mover.Model.Parent then
 		mover.Model:PivotTo(mover.Base)
 	end
@@ -208781,12 +208822,6 @@ local function start(stationId)
 		end
 		-- A grabbed bar should no longer remain visibly floating on the rack/platform
 		-- for this player. Other players still see their own local copy of the stock.
-		if stationDef.Kind == "Deadlift" and character then
-			-- same pose system as the boulder / machines; the held bar follows the hands
-			joints = findJoints(character)
-			driver = joints and PoseDriver.new(joints) or nil
-			applyPose(POSES.Deadlift.Rest, 0.35) -- grab it: go down to the bar on the floor
-		end
 		if stationDef.Kind == "Squat" or stationDef.Kind == "Deadlift" then
 			local stockModel = findStationModel(stationId)
 			hiddenStockMover = stockModel and stockModel:FindFirstChild("Mover") or nil
@@ -208812,6 +208847,31 @@ local function start(stationId)
 			driver = joints and PoseDriver.new(joints) or nil
 		end
 		local pose = POSES[stationDef.Pose] or POSES.Press
+		if pose.Held and m then
+			-- carry the weight: hide the stock one, hold a local copy between the hands
+			local copy = m:Clone()
+			for _, d in ipairs(copy:GetDescendants()) do
+				if d:IsA("BasePart") then
+					d.Anchored = true
+					d.CanCollide = false
+					d.CanQuery = false
+					d.CanTouch = false
+				end
+			end
+			copy.Name = "HeldWeight"
+			copy.Parent = workspace
+			setStockVisible(m, false)
+			hiddenStockMover = m
+			mover = nil
+			-- keep the weight's own orientation relative to the player (bar across the body)
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local offset = CFrame.new()
+			if root then
+				local pivot = m:GetPivot()
+				offset = (root.CFrame - root.CFrame.Position):Inverse() * (pivot - pivot.Position)
+			end
+			held = { Model = copy, Offset = offset }
+		end
 		if stationDef.Kind == "Treadmill" then
 			treadmillPhase = 0
 			treadmillRunning = true
@@ -208858,14 +208918,6 @@ local function playRep()
 	repCount = repCount + 1
 	if freeWeight then
 		FreeweightAnim.Rep(false)
-		if stationDef.Kind == "Deadlift" and driver then
-			local pose = POSES.Deadlift
-			applyPose(pose.Rep, pose.Out)
-			local myStation = stationDef
-			task.delay(pose.Out + (pose.Hold or 0.06), function()
-				if active and stationDef == myStation then applyPose(pose.Rest, pose.Back) end
-			end)
-		end
 	else
 		if stationDef.Kind == "Treadmill" then
 			jogBoost = 1
@@ -208877,13 +208929,21 @@ local function playRep()
 			end
 		else
 			local pose = POSES[stationDef.Pose] or POSES.Press
+			if os.clock() &lt; repBusyUntil then
+				-- still mid-rep: the click counts (server), the animation just keeps playing
+				if mover then mover.Kick = 1 end
+				Sfx.Play("Rep", 1 + math.min(repCount % 8, 6) * 0.03)
+				if C and C.HUD.SetReps then C.HUD.SetReps(repCount) end
+				return
+			end
 			local repPose = pose.Rep
 			if pose.Alt and repCount % 2 == 0 then repPose = pose.Rep2 end
 			if pose.Crit and repCount % 5 == 0 then repPose = pose.Crit end
 			local out, back = pose.Out or 0.12, pose.Back or 0.18
+			repBusyUntil = os.clock() + out + (pose.Hold or 0.03) + back
 			applyPose(repPose, out)
 			local myStation = stationDef
-			task.delay(out + 0.03, function()
+			task.delay(out + (pose.Hold or 0.03), function()
 				if active and stationDef == myStation then applyPose(pose.Rest, back) end
 			end)
 		end
@@ -209014,6 +209074,7 @@ function TrainingController.Init(client)
 	RunService.RenderStepped:Connect(function(dt)
 		if active and not freeWeight then
 			updateMover(dt)
+			updateHeld()
 		end
 	end)
 
@@ -210108,7 +210169,7 @@ local gates = {}         -- [areaId] = { Slab, Prompt, Label, Bar, Status, Open,
 local eggBodies = {}     -- { Body, Base, Phase }
 local orbs = {}          -- [part] = { Base, Phase }
 local initialSync = false
-local FREE_WEIGHT = { Dumbbell = true, Squat = true, Deadlift = true }
+local FREE_WEIGHT = { Dumbbell = true, Squat = true }
 
 ----------------------------------------------------------------------
 -- Label helper
