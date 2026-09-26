@@ -192588,7 +192588,12 @@ Config.Game = {
 -- hiding the button on the client is only cosmetic.
 ----------------------------------------------------------------------
 Config.Admin = {
-	-- PUT YOUR ROBLOX USER ID HERE (and your co-owners'). Explicit ids always work.
+	-- Owners (every permission). The game's creator is an owner automatically; add your
+	-- own UserId here too if the game is unpublished / owned by someone else's group.
+	OwnerUserIds = {
+		-- 123456789,
+	},
+	-- Admin rank by UserId (explicit ids always work).
 	UserIds = {
 		-- 123456789,
 	},
@@ -194273,7 +194278,7 @@ local storedRanks = {}  -- [userId] = rank name given in-game (rank DataStore)
 local rankStore
 AdminService.Levels = LEVEL
 
-local adminIds, superIds = {}, {}
+local adminIds, superIds, ownerIds = {}, {}, {}
 local levelCache = {}  -- [player] = { Level = n, Until = os.clock() }
 local frozen = {}      -- [userId] = true (re-applied on every respawn, cleared when they leave)
 local lastDenied = {}  -- [player] = os.clock() of the last logged unauthorized call
@@ -194312,6 +194317,14 @@ end
 local function computeConfigLevel(player)
 	local userId = player.UserId
 	local certain = true
+	if ownerIds[userId] then
+		return LEVEL.Owner, true
+	end
+	-- Studio "Play": the developer testing with their own account (UserId &gt; 0) is the owner.
+	-- Extra "Local Server" test players have negative ids and stay Studio testers.
+	if Cfg.AllowStudioTesting and RunService:IsStudio() and userId &gt; 0 then
+		return LEVEL.Owner, true
+	end
 	if Cfg.AllowGameCreator then
 		if game.CreatorType == Enum.CreatorType.User then
 			if game.CreatorId &gt; 0 and userId == game.CreatorId then
@@ -194378,6 +194391,9 @@ end
 
 -- Level of any account (it may be offline). Returns level, certain.
 local function configLevelOfUserId(userId)
+	if ownerIds[userId] then
+		return LEVEL.Owner, true
+	end
 	local online = Players:GetPlayerByUserId(userId)
 	if online then
 		return AdminService.GetLevel(online), true
@@ -196037,6 +196053,7 @@ function AdminService.Init(services)
 	MAX = Config.Game.MaxValue
 	adminIds = toSet(Cfg.UserIds)
 	superIds = toSet(Cfg.SuperAdminUserIds)
+	ownerIds = toSet(Cfg.OwnerUserIds)
 	for _, rank in ipairs(Cfg.Ranks or {}) do
 		ranksByName[rank.Name] = rank
 		ranksByLevel[rank.Level] = rank
