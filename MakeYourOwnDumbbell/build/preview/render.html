@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Place Preview</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<script type="module">
+// Approximate renderer for Roblox part geometry, used only to eyeball the map outside
+// Studio. Materials/lighting are rough stand-ins for Roblox's Future lighting.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w') || 1600), H = +(q.get('h') || 900);
+const data = await (await fetch(q.get('data') || '/parts.json')).json();
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = q.get('shadows') !== '0';
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = +(q.get('exposure') || 1.0);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const clock = data.lighting?.clock ?? 14;
+const night = clock < 6 || clock > 18.5;
+
+// sky gradient
+{
+  const c = document.createElement('canvas'); c.width = 4; c.height = 512;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 512);
+  if (night) { grd.addColorStop(0, '#0b0f2a'); grd.addColorStop(0.6, '#1c2250'); grd.addColorStop(1, '#3a2e6a'); }
+  else { grd.addColorStop(0, '#3f8ee8'); grd.addColorStop(0.55, '#8cc4f5'); grd.addColorStop(1, '#dff1ff'); }
+  g.fillStyle = grd; g.fillRect(0, 0, 4, 512);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = tex;
+}
+scene.fog = new THREE.Fog(night ? 0x1c2250 : 0xcfe8ff, 700, 2600);
+
+const hemi = new THREE.HemisphereLight(night ? 0x5566aa : 0xcfe6ff, night ? 0x222233 : 0x6b7a5a, night ? 0.5 : 1.25);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(night ? 0x8899ff : 0xfff1dc, night ? 0.5 : 2.6);
+const sunAz = THREE.MathUtils.degToRad(+(q.get('sunaz') || 35));
+const sunEl = THREE.MathUtils.degToRad(+(q.get('sunel') || 52));
+sun.position.set(Math.cos(sunAz) * Math.cos(sunEl), Math.sin(sunEl), Math.sin(sunAz) * Math.cos(sunEl)).multiplyScalar(900);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+const sr = +(q.get('shadowr') || 520);
+Object.assign(sun.shadow.camera, { left: -sr, right: sr, top: sr, bottom: -sr, near: 10, far: 2400 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.6;
+const target = new THREE.Object3D();
+const tgt = (q.get('look') || '0,0,0').split(',').map(Number);
+target.position.set(...tgt);
+scene.add(target);
+sun.target = target;
+sun.position.add(target.position);
+scene.add(sun);
+
+// geometries (unit size)
+const geo = {
+  box: new THREE.BoxGeometry(1, 1, 1),
+  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 36).rotateZ(Math.PI / 2),
+  cylY: new THREE.CylinderGeometry(0.5, 0.5, 1, 36),
+  ball: new THREE.SphereGeometry(0.5, 32, 20),
+  head: new THREE.CapsuleGeometry(0.42, 0.3, 8, 20),
+  ellipsoid: new THREE.SphereGeometry(0.5, 32, 20),
+};
+{ // wedge: slope rises toward +Z
+  const g = new THREE.BufferGeometry();
+  const v = [
+    // bottom
+    -0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,-0.5,0.5,   -0.5,-0.5,-0.5,  0.5,-0.5,0.5,  -0.5,-0.5,0.5,
+    // back (z=+0.5)
+    -0.5,-0.5,0.5,  0.5,-0.5,0.5,  0.5,0.5,0.5,   -0.5,-0.5,0.5,  0.5,0.5,0.5,  -0.5,0.5,0.5,
+    // slope
+    -0.5,-0.5,-0.5,  -0.5,0.5,0.5,  0.5,0.5,0.5,   -0.5,-0.5,-0.5,  0.5,0.5,0.5,  0.5,-0.5,-0.5,
+    // sides
+    -0.5,-0.5,-0.5,  -0.5,-0.5,0.5,  -0.5,0.5,0.5,
+    0.5,-0.5,-0.5,  0.5,0.5,0.5,  0.5,-0.5,0.5,
+  ];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  geo.wedge = g;
+}
+geo.corner = geo.wedge;
+
+const matProps = (m) => {
+  switch (m) {
+    case 'Metal': case 'DiamondPlate': return { roughness: 0.35, metalness: 0.75 };
+    case 'CorrodedMetal': return { roughness: 0.7, metalness: 0.5 };
+    case 'Foil': return { roughness: 0.18, metalness: 0.9 };
+    case 'Glass': return { roughness: 0.05, metalness: 0.1 };
+    case 'Ice': case 'Glacier': return { roughness: 0.12, metalness: 0.05 };
+    case 'Marble': return { roughness: 0.25, metalness: 0.0 };
+    case 'SmoothPlastic': return { roughness: 0.45, metalness: 0.0 };
+    case 'Plastic': return { roughness: 0.6, metalness: 0.0 };
+    case 'Wood': case 'WoodPlanks': return { roughness: 0.8, metalness: 0.0 };
+    case 'Fabric': case 'Carpet': case 'Rubber': return { roughness: 0.9, metalness: 0.0 };
+    default: return { roughness: 0.95, metalness: 0.0 };
+  }
+};
+
+const mats = new Map();
+function getMat(p) {
+  const key = p.c.join(',') + '|' + p.m + '|' + Math.round((p.t || 0) * 20) + '|' + Math.round((p.f || 0) * 10);
+  let mat = mats.get(key);
+  if (mat) return mat;
+  const col = new THREE.Color(`rgb(${p.c[0]},${p.c[1]},${p.c[2]})`);
+  if (p.m === 'Neon') {
+    mat = new THREE.MeshBasicMaterial({ color: col.clone().multiplyScalar(1.6) });
+  } else if (p.m === 'ForceField') {
+    mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending });
+  } else {
+    const pr = matProps(p.m);
+    mat = new THREE.MeshStandardMaterial({ color: col, ...pr });
+    if (p.f > 0) { mat.metalness = Math.max(mat.metalness, p.f * 0.8); mat.roughness = Math.min(mat.roughness, 0.3); }
+    if (p.m === 'CrackedLava') { mat.emissive = new THREE.Color(0x531400); }
+  }
+  const t = p.t || 0;
+  if (t > 0.01 && p.m !== 'ForceField') {
+    mat.transparent = true;
+    mat.opacity = Math.max(0.12, 1 - t);
+    mat.depthWrite = t < 0.4;
+  }
+  mats.set(key, mat);
+  return mat;
+}
+
+// group into instanced meshes
+const groups = new Map();
+for (const p of data.parts) {
+  const g = geo[p.s] ? p.s : 'box';
+  const mat = getMat(p);
+  const key = g + '#' + mat.uuid;
+  let grp = groups.get(key);
+  if (!grp) { grp = { g, mat, items: [] }; groups.set(key, grp); }
+  grp.items.push(p);
+}
+const m4 = new THREE.Matrix4(), sc = new THREE.Matrix4();
+for (const grp of groups.values()) {
+  const mesh = new THREE.InstancedMesh(geo[grp.g], grp.mat, grp.items.length);
+  grp.items.forEach((p, i) => {
+    const r = p.r;
+    m4.set(r[0], r[1], r[2], p.p[0], r[3], r[4], r[5], p.p[1], r[6], r[7], r[8], p.p[2], 0, 0, 0, 1);
+    let [sx, sy, sz] = p.z;
+    if (grp.g === 'ball') { const d = Math.min(sx, sy, sz); sx = sy = sz = d; }
+    if (grp.g === 'cyl') { const d = Math.min(sy, sz); sy = sz = d; }
+    sc.makeScale(sx, sy, sz);
+    mesh.setMatrixAt(i, m4.clone().multiply(sc));
+  });
+  const opaque = !grp.mat.transparent && !(grp.mat instanceof THREE.MeshBasicMaterial);
+  mesh.castShadow = opaque;
+  mesh.receiveShadow = !(grp.mat instanceof THREE.MeshBasicMaterial);
+  scene.add(mesh);
+}
+
+// a few point lights
+const lights = data.parts.filter(p => p.l).sort((a, b) => b.l[4] - a.l[4]).slice(0, +(q.get('lights') || 40));
+for (const p of lights) {
+  const L = new THREE.PointLight(new THREE.Color(`rgb(${p.l[0]},${p.l[1]},${p.l[2]})`), p.l[4] * 60, p.l[3] * 1.6, 1.6);
+  L.position.set(...p.p);
+  scene.add(L);
+}
+
+const pos = (q.get('pos') || '0,400,700').split(',').map(Number);
+const camera = new THREE.PerspectiveCamera(+(q.get('fov') || 55), W / H, 0.5, 6000);
+camera.position.set(...pos);
+camera.lookAt(new THREE.Vector3(...tgt));
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), +(q.get('bloom') || 0.45), 0.5, 0.85));
+composer.addPass(new OutputPass());
+composer.render();
+window.__done = true;
+</script>
+</body>
+</html>

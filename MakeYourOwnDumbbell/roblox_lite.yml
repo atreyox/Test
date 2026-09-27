@@ -1,0 +1,93 @@
+# Minimal Roblox standard library for selene (the full one needs a network download).
+# Every Roblox global is declared "any" so selene can still catch undefined variables,
+# typos in local names and unused code.
+---
+base: luau
+name: roblox_lite
+globals:
+  game:
+    any: true
+  workspace:
+    any: true
+  script:
+    any: true
+  shared:
+    any: true
+  Instance:
+    any: true
+  Vector3:
+    any: true
+  Vector2:
+    any: true
+  Vector3int16:
+    any: true
+  CFrame:
+    any: true
+  Color3:
+    any: true
+  BrickColor:
+    any: true
+  UDim:
+    any: true
+  UDim2:
+    any: true
+  Enum:
+    any: true
+  Rect:
+    any: true
+  Ray:
+    any: true
+  Region3:
+    any: true
+  NumberRange:
+    any: true
+  NumberSequence:
+    any: true
+  NumberSequenceKeypoint:
+    any: true
+  ColorSequence:
+    any: true
+  ColorSequenceKeypoint:
+    any: true
+  PhysicalProperties:
+    any: true
+  TweenInfo:
+    any: true
+  RaycastParams:
+    any: true
+  OverlapParams:
+    any: true
+  Random:
+    any: true
+  DateTime:
+    any: true
+  Font:
+    any: true
+  Axes:
+    any: true
+  Faces:
+    any: true
+  task:
+    any: true
+  tick:
+    any: true
+  time:
+    any: true
+  wait:
+    any: true
+  delay:
+    any: true
+  spawn:
+    any: true
+  warn:
+    any: true
+  typeof:
+    any: true
+  settings:
+    any: true
+  UserSettings:
+    any: true
+  elapsedTime:
+    any: true
+  buffer:
+    any: true

@@ -1,0 +1,9 @@
+{
+  "name": "myod-preview",
+  "private": true,
+  "type": "module",
+  "description": "Offline three.js preview of the built place (for checking the look without Studio).",
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}
