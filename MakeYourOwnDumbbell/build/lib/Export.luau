@@ -78,9 +78,16 @@ function Export.Write(roots: { any }, outPath: string, lighting: any?)
 	end
 	local out = { parts = parts }
 	if lighting then
+		-- a fresh DataModel's Lighting has no stored ClockTime/Brightness yet
+		local okClock, clock = pcall(function()
+			return lighting.ClockTime
+		end)
+		local okBright, brightness = pcall(function()
+			return lighting.Brightness
+		end)
 		out.lighting = {
-			clock = lighting.ClockTime,
-			brightness = lighting.Brightness,
+			clock = okClock and clock or 14,
+			brightness = okBright and brightness or 2,
 		}
 	end
 	fs.writeFile(outPath, serde.encode("json", out))
